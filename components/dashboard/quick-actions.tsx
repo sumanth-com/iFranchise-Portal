@@ -7,9 +7,21 @@ import { FileText, Images, Send } from "lucide-react";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 
 const actions = [
-  { href: "#profile", label: "Edit profile", icon: FileText },
-  { href: "#assets", label: "Upload assets", icon: Images },
-  { href: "#profile", label: "Submit brand", icon: Send },
+  {
+    href: "/dashboard/onboarding?step=1",
+    label: "Edit profile",
+    icon: FileText,
+  },
+  {
+    href: "/dashboard/onboarding?step=2",
+    label: "Upload assets",
+    icon: Images,
+  },
+  {
+    href: "/dashboard/onboarding?step=9",
+    label: "Submit brand",
+    icon: Send,
+  },
 ];
 
 export function QuickActions() {

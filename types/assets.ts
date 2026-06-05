@@ -1,4 +1,9 @@
-export type AssetType = "logo" | "gallery";
+export type AssetType =
+  | "logo"
+  | "gallery"
+  | "store_photo"
+  | "product_photo"
+  | "document";
 
 export type BrandAsset = {
   id: string;
@@ -18,6 +23,9 @@ export type BrandAssetWithUrl = BrandAsset & {
 export type BrandAssetsBundle = {
   logo: BrandAssetWithUrl | null;
   gallery: BrandAssetWithUrl[];
+  storePhotos: BrandAssetWithUrl[];
+  productPhotos: BrandAssetWithUrl[];
+  documents: BrandAssetWithUrl[];
 };
 
 export type AssetActionState = {

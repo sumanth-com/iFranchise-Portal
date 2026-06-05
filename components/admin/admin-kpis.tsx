@@ -48,7 +48,7 @@ export function AdminKpis({ brands }: AdminKpisProps) {
         value={approved}
         icon={CheckCircle2}
         accent="success"
-        subtext="Live on website"
+        subtext="Publish ready"
       />
       <KpiCard
         label="Rejected brands"

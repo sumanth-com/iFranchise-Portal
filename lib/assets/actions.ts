@@ -6,8 +6,10 @@ import { BRAND_ASSETS_BUCKET } from "@/lib/assets/constants";
 import { getBrandAssetById } from "@/lib/assets/queries";
 import {
   buildStoragePath,
+  validateDocumentFile,
   validateImageFile,
 } from "@/lib/assets/validation";
+import type { AssetType } from "@/types/assets";
 import { requireClient } from "@/lib/auth/session";
 import { getClientBrand } from "@/lib/brand/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +19,7 @@ import { isBrandEditable } from "@/types/brand";
 
 function revalidateDashboard() {
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/onboarding");
 }
 
 async function assertEditableBrand(brandId: string) {
@@ -149,11 +152,40 @@ export async function uploadLogo(
   };
 }
 
+const VALID_UPLOAD_TYPES = new Set<AssetType>([
+  "gallery",
+  "store_photo",
+  "product_photo",
+  "document",
+]);
+
+function parseUploadAssetType(formData: FormData): AssetType {
+  const raw = String(formData.get("assetType") ?? "gallery").trim();
+  if (VALID_UPLOAD_TYPES.has(raw as AssetType)) {
+    return raw as AssetType;
+  }
+  return "gallery";
+}
+
+function uploadTypeLabel(assetType: AssetType, count: number): string {
+  if (assetType === "document") {
+    return count === 1 ? "Document uploaded." : `${count} documents uploaded.`;
+  }
+  if (assetType === "store_photo") {
+    return count === 1 ? "Store photo uploaded." : `${count} store photos uploaded.`;
+  }
+  if (assetType === "product_photo") {
+    return count === 1 ? "Product photo uploaded." : `${count} product photos uploaded.`;
+  }
+  return count === 1 ? "Gallery image uploaded." : `${count} gallery images uploaded.`;
+}
+
 export async function uploadGalleryImages(
   _prevState: AssetActionState,
   formData: FormData,
 ): Promise<AssetActionState> {
   const brandId = String(formData.get("brandId") ?? "").trim();
+  const assetType = parseUploadAssetType(formData);
   const files = formData
     .getAll("files")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
@@ -163,7 +195,12 @@ export async function uploadGalleryImages(
   }
 
   if (files.length === 0) {
-    return { error: "Please select at least one image.", message: null };
+    return {
+      error: assetType === "document"
+        ? "Please select at least one PDF."
+        : "Please select at least one image.",
+      message: null,
+    };
   }
 
   const access = await assertEditableBrand(brandId);
@@ -175,7 +212,10 @@ export async function uploadGalleryImages(
   let uploadedCount = 0;
 
   for (const file of files) {
-    const validationError = validateImageFile(file);
+    const validationError =
+      assetType === "document"
+        ? validateDocumentFile(file)
+        : validateImageFile(file);
     if (validationError) {
       return { error: validationError, message: null };
     }
@@ -183,7 +223,7 @@ export async function uploadGalleryImages(
     const storagePath = buildStoragePath(
       access.profile.id,
       brandId,
-      "gallery",
+      assetType,
       file.name,
     );
 
@@ -202,17 +242,17 @@ export async function uploadGalleryImages(
 
     const { error: insertError } = await supabase.from("brand_assets").insert({
       brand_id: brandId,
-      asset_type: "gallery",
+      asset_type: assetType,
       storage_path: storagePath,
       file_name: file.name,
-      mime_type: file.type,
+      mime_type: file.type || (assetType === "document" ? "application/pdf" : file.type),
       file_size: file.size,
     });
 
     if (insertError) {
       await supabase.storage.from(BRAND_ASSETS_BUCKET).remove([storagePath]);
       return {
-        error: insertError.message || "Failed to save gallery metadata.",
+        error: insertError.message || "Failed to save asset metadata.",
         message: null,
       };
     }
@@ -223,10 +263,7 @@ export async function uploadGalleryImages(
   revalidateDashboard();
   return {
     error: null,
-    message:
-      uploadedCount === 1
-        ? "Gallery image uploaded."
-        : `${uploadedCount} gallery images uploaded.`,
+    message: uploadTypeLabel(assetType, uploadedCount),
   };
 }
 
@@ -279,8 +316,14 @@ export async function deleteBrandAsset(
   }
 
   revalidateDashboard();
+  const removedLabel =
+    asset.asset_type === "logo"
+      ? "Logo removed."
+      : asset.asset_type === "document"
+        ? "Document removed."
+        : "File removed.";
   return {
     error: null,
-    message: asset.asset_type === "logo" ? "Logo removed." : "Image removed.",
+    message: removedLabel,
   };
 }

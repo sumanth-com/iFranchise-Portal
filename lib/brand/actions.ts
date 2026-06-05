@@ -15,6 +15,7 @@ import { isBrandEditable } from "@/types/brand";
 
 function revalidateDashboard() {
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/onboarding");
 }
 
 async function getOwnedBrand(userId: string): Promise<Brand | null> {

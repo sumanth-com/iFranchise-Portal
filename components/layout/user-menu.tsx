@@ -11,9 +11,15 @@ type UserMenuProps = {
   email: string;
   name?: string | null;
   role: "client" | "admin";
+  variant?: "brand" | "mono";
 };
 
-export function UserMenu({ email, name, role }: UserMenuProps) {
+export function UserMenu({
+  email,
+  name,
+  role,
+  variant = "brand",
+}: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const initials = (name || email).slice(0, 2).toUpperCase();
 
@@ -24,14 +30,33 @@ export function UserMenu({ email, name, role }: UserMenuProps) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-2 py-1.5 text-sm hover:bg-surface-muted"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-600 to-accent-500 text-xs font-semibold text-white">
+        <span
+          className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold",
+            variant === "mono"
+              ? "border border-black bg-white text-black"
+              : "bg-gradient-to-br from-primary-600 to-accent-500 text-white",
+          )}
+        >
           {initials}
         </span>
         <span className="hidden max-w-[120px] truncate text-left sm:block">
-          <span className="block font-medium text-foreground">
+          <span
+            className={cn(
+              "block font-medium",
+              variant === "mono" ? "text-black" : "text-foreground",
+            )}
+          >
             {name || email.split("@")[0]}
           </span>
-          <span className="block text-xs capitalize text-slate-500">{role}</span>
+          <span
+            className={cn(
+              "block text-xs capitalize",
+              variant === "mono" ? "text-black" : "text-slate-500",
+            )}
+          >
+            {role}
+          </span>
         </span>
         <ChevronDown className="hidden h-4 w-4 text-slate-400 sm:block" />
       </button>
@@ -49,12 +74,20 @@ export function UserMenu({ email, name, role }: UserMenuProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="absolute right-0 z-50 mt-2 w-56 rounded-[var(--radius-lg)] border border-border bg-surface p-2 shadow-[var(--shadow-md)]"
           >
-            <p className="px-3 py-2 text-xs text-slate-500">{email}</p>
+            <p
+              className={cn(
+                "px-3 py-2 text-xs",
+                variant === "mono" ? "text-black" : "text-slate-500",
+              )}
+            >
+              {email}
+            </p>
             <form action={logout}>
               <button
                 type="submit"
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-slate-700 hover:bg-surface-muted",
+                  "flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm hover:bg-surface-muted",
+                  variant === "mono" ? "text-black" : "text-slate-700",
                 )}
               >
                 <LogOut className="h-4 w-4" />

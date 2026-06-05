@@ -1,16 +1,6 @@
-import { Agent, type Dispatcher } from "undici";
-
-const CONNECT_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1_500;
-
-/** Longer connect timeout — default undici 10s fails on slow networks to Supabase. */
-const supabaseDispatcher: Dispatcher = new Agent({
-  connect: { timeout: CONNECT_TIMEOUT_MS },
-  bodyTimeout: REQUEST_TIMEOUT_MS,
-  headersTimeout: REQUEST_TIMEOUT_MS,
-});
 
 function isRetriableFetchError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -35,10 +25,9 @@ function isRetriableFetchError(error: unknown): boolean {
   );
 }
 
-type FetchInitWithDispatcher = RequestInit & { dispatcher?: Dispatcher };
-
 /**
- * Fetch wrapper with extended connect timeout and one retry for slow networks.
+ * Edge- and browser-safe fetch with timeout + one retry.
+ * Used by middleware and client components (no Node-only modules).
  */
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -52,13 +41,10 @@ export async function fetchWithTimeout(
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const fetchInit: FetchInitWithDispatcher = {
+      const response = await fetch(input, {
         ...init,
         signal: controller.signal,
-        dispatcher: supabaseDispatcher,
-      };
-
-      const response = await fetch(input, fetchInit);
+      });
       return response;
     } catch (error) {
       lastError = error;

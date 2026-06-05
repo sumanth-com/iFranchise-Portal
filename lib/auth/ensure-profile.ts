@@ -1,4 +1,8 @@
-import { getProfileByUserId } from "@/lib/auth/session";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
+import { authDebug, PROFILE_CORE_FIELDS } from "@/lib/auth/profile";
+import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { createClientOptional } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Profile } from "@/types/auth";
@@ -9,14 +13,12 @@ type EnsureProfileUser = {
   user_metadata?: { full_name?: string } | null;
 };
 
-const PROFILE_SELECT =
-  "id, email, full_name, role, team_role, is_active, created_at, updated_at";
-
 async function createProfileViaService(
   user: EnsureProfileUser,
 ): Promise<Profile | null> {
   const service = createServiceClient();
   if (!service) {
+    authDebug("ensure-profile-service-missing", { userId: user.id });
     return null;
   }
 
@@ -46,40 +48,80 @@ async function createProfileViaService(
       },
       { onConflict: "id" },
     )
-    .select(PROFILE_SELECT)
+    .select(PROFILE_CORE_FIELDS)
     .single();
 
   if (error || !data) {
+    authDebug("ensure-profile-service-failed", {
+      userId: user.id,
+      error: error?.message ?? "no data",
+    });
     return null;
   }
 
-  return data as Profile;
+  authDebug("ensure-profile-created-service", { userId: user.id });
+
+  return {
+    ...data,
+    team_role: null,
+    is_active: true,
+  } as Profile;
 }
 
-async function createProfileViaRpc(): Promise<Profile | null> {
-  const supabase = await createClientOptional();
-  if (!supabase) {
-    return null;
-  }
-
+async function createProfileViaRpc(
+  supabase: SupabaseClient,
+): Promise<Profile | null> {
   const { data, error } = await supabase.rpc("ensure_own_profile");
+
   if (error || !data) {
+    authDebug("ensure-profile-rpc-failed", {
+      error: error?.message ?? "no data",
+      code: error?.code,
+    });
     return null;
   }
 
-  return data as Profile;
+  authDebug("ensure-profile-created-rpc", { userId: data.id });
+
+  return {
+    ...data,
+    team_role: data.team_role ?? null,
+    is_active: data.is_active ?? true,
+  } as Profile;
 }
 
 /**
  * Returns an existing profile or creates one for the authenticated user.
- * Handles OAuth users and accounts created before the signup trigger existed.
+ * Pass the same Supabase client used for sign-in so the session is available for RLS.
  */
 export async function ensureProfileForUser(
   user: EnsureProfileUser,
+  supabaseClient?: SupabaseClient,
 ): Promise<Profile | null> {
-  const existing = await getProfileByUserId(user.id);
-  if (existing) {
-    return existing;
+  const supabase = supabaseClient ?? (await createClientOptional());
+  if (!supabase) {
+    authDebug("ensure-profile-no-client", { userId: user.id });
+    return null;
+  }
+
+  try {
+    const existing = await fetchProfileByUserId(supabase, user.id);
+    if (existing.profile) {
+      return existing.profile;
+    }
+
+    authDebug("ensure-profile-repair", {
+      userId: user.id,
+      reason: existing.error,
+    });
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      throw error;
+    }
+    authDebug("ensure-profile-load-exception", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const viaService = await createProfileViaService(user);
@@ -87,5 +129,5 @@ export async function ensureProfileForUser(
     return viaService;
   }
 
-  return createProfileViaRpc();
+  return createProfileViaRpc(supabase);
 }

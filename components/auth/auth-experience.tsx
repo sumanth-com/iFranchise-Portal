@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useActionState } from "react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -9,7 +9,11 @@ import { AuthAlert } from "@/components/auth/auth-alert";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { RepairAccountButton } from "@/components/auth/repair-account-button";
 import { PremiumInput } from "@/components/auth/premium-input";
-import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
+import {
+  AUTH_ROLE_COPY,
+  RoleSelector,
+  type AuthPortalRole,
+} from "@/components/auth/role-selector";
 import {
   AUTH_ERROR_CODES,
   isBlockingAuthError,
@@ -27,22 +31,39 @@ type AuthTab = "login" | "signup" | "forgot";
 
 type AuthExperienceProps = {
   initialTab: AuthTab;
+  initialRole?: AuthPortalRole;
   redirectTo?: string | null;
   pageError?: string | null;
   authErrorCode?: string | null;
+  envConfigured?: boolean;
+  hasSession?: boolean;
+  hasProfile?: boolean;
 };
+
+function parseInitialRole(value: AuthPortalRole | undefined): AuthPortalRole {
+  return value === "admin" ? "admin" : "client";
+}
 
 export function AuthExperience({
   initialTab,
+  initialRole,
   redirectTo,
   pageError,
   authErrorCode,
+  envConfigured = true,
+  hasSession = false,
+  hasProfile = false,
 }: AuthExperienceProps) {
   const [tab, setTab] = useState<AuthTab>(initialTab);
+  const [role, setRole] = useState<AuthPortalRole>(parseInitialRole(initialRole));
 
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    setRole(parseInitialRole(initialRole));
+  }, [initialRole]);
 
   const [loginState, loginAction, loginPending] = useActionState(
     login,
@@ -57,19 +78,14 @@ export function AuthExperience({
     initialAuthActionState,
   );
 
+  const roleCopy = AUTH_ROLE_COPY[role];
+
   const title =
     tab === "login"
-      ? "Welcome Back"
+      ? "Welcome back"
       : tab === "signup"
         ? "Create your account"
         : "Reset your password";
-
-  const subtitle =
-    tab === "login"
-      ? "Sign in to continue to your account."
-      : tab === "signup"
-        ? "Register as a client. Your profile is created automatically."
-        : "We’ll email you a link to choose a new password.";
 
   const pendingForTab =
     tab === "login"
@@ -79,18 +95,25 @@ export function AuthExperience({
         : forgotPending;
 
   const sessionBlocked =
-    isBlockingAuthError(authErrorCode) && authErrorCode !== "unavailable";
+    (isBlockingAuthError(authErrorCode) && authErrorCode !== "unavailable") ||
+    (hasSession && !hasProfile);
 
   const accountIssueMessage =
     pageError ??
     (isAccountLevelFormError(loginState.error) ? loginState.error : null);
 
-  const showAccountIssue = sessionBlocked || Boolean(accountIssueMessage);
+  const showAccountIssue =
+    sessionBlocked || Boolean(accountIssueMessage) || !envConfigured;
+
+  const showUnavailableOnly =
+    !envConfigured || authErrorCode === AUTH_ERROR_CODES.unavailable;
 
   const loginFormError =
     loginState.error && !isAccountLevelFormError(loginState.error)
       ? loginState.error
       : null;
+
+  const showRoleSelector = tab !== "forgot" && !showAccountIssue;
 
   return (
     <motion.div
@@ -101,13 +124,39 @@ export function AuthExperience({
     >
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          {showAccountIssue ? "Account needs attention" : title}
+          {!envConfigured
+            ? "Configuration required"
+            : showAccountIssue && !showUnavailableOnly
+              ? "Account needs attention"
+              : showUnavailableOnly && showAccountIssue
+                ? "Connection issue"
+                : title}
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">
-          {showAccountIssue
-            ? "You are signed in, but we could not finish loading your account."
-            : subtitle}
-        </p>
+
+        {showAccountIssue ? (
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            {!envConfigured
+              ? "Supabase environment variables are missing or invalid."
+              : showUnavailableOnly
+                ? "We could not reach the authentication service."
+                : "You are signed in, but we could not finish loading your account."}
+          </p>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={`${tab}-${role}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22 }}
+              className="mt-2 text-sm leading-relaxed text-slate-500"
+            >
+              {tab === "forgot"
+                ? "We'll email you a link to choose a new password."
+                : roleCopy.description}
+            </motion.p>
+          </AnimatePresence>
+        )}
       </div>
 
       {showAccountIssue ? (
@@ -115,39 +164,70 @@ export function AuthExperience({
           {accountIssueMessage ? (
             <AuthAlert error={accountIssueMessage} message={null} />
           ) : null}
-          <p className="text-sm text-slate-500">
-            {authErrorCode === AUTH_ERROR_CODES.profile
-              ? "We can try to finish setting up your account automatically."
-              : "Sign out and try again, or contact support if this continues."}
-          </p>
+          {!envConfigured ? (
+            <p className="text-sm text-slate-500">
+              Add{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                NEXT_PUBLIC_SUPABASE_URL
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+              </code>{" "}
+              (or{" "}
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                NEXT_PUBLIC_SUPABASE_ANON_KEY
+              </code>
+              ) to <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">.env.local</code>{" "}
+              and restart the dev server.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {authErrorCode === AUTH_ERROR_CODES.profile || (hasSession && !hasProfile)
+                ? "We can try to finish setting up your account automatically."
+                : authErrorCode === AUTH_ERROR_CODES.unavailable
+                  ? "Check your internet connection and try again in a moment."
+                  : "Sign out and try again, or contact support if this continues."}
+            </p>
+          )}
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            {authErrorCode === AUTH_ERROR_CODES.profile ? (
+            {envConfigured &&
+            (authErrorCode === AUTH_ERROR_CODES.profile ||
+              (hasSession && !hasProfile)) ? (
               <RepairAccountButton redirectTo={redirectTo} />
             ) : null}
-            <LogoutButton />
+            {hasSession ? <LogoutButton /> : null}
           </div>
         </div>
       ) : (
         <>
-          <div className="mt-5 flex gap-3 rounded-[16px] bg-slate-50 p-1 ring-1 ring-slate-200/60">
-            <TabButton active={tab === "login"} onClick={() => setTab("login")}>
-              Sign In
-            </TabButton>
-            <TabButton
-              active={tab === "signup"}
-              onClick={() => setTab("signup")}
-            >
-              Create Account
-            </TabButton>
-          </div>
+          {showRoleSelector ? (
+            <div className="mt-5">
+              <RoleSelector value={role} onChange={setRole} />
+            </div>
+          ) : null}
 
-          {/* Forms */}
+          {tab !== "forgot" ? (
+            <div className="mt-5 flex gap-3 rounded-[16px] bg-slate-50 p-1 ring-1 ring-slate-200/60">
+              <TabButton active={tab === "login"} onClick={() => setTab("login")}>
+                Sign In
+              </TabButton>
+              <TabButton
+                active={tab === "signup"}
+                onClick={() => setTab("signup")}
+              >
+                Create Account
+              </TabButton>
+            </div>
+          ) : null}
+
           <div className="mt-5">
             {tab === "login" ? (
               <form action={loginAction} className="space-y-3.5">
                 {redirectTo ? (
                   <input type="hidden" name="redirectTo" value={redirectTo} />
                 ) : null}
+                <input type="hidden" name="expectedRole" value={role} />
 
                 <AuthAlert
                   error={loginFormError}
@@ -160,7 +240,11 @@ export function AuthExperience({
                   type="email"
                   autoComplete="email"
                   required
-                  placeholder="e.g. you@example.com"
+                  placeholder={
+                    role === "admin"
+                      ? "e.g. admin@ifranchise.com"
+                      : "e.g. you@brand.com"
+                  }
                   error={getFieldFormError(loginState.error, "email")}
                 />
 
@@ -174,109 +258,115 @@ export function AuthExperience({
                   error={getFieldFormError(loginState.error, "password")}
                 />
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
-                  defaultChecked={false}
-                  name="remember"
-                />
-                Remember me
-              </label>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
+                      defaultChecked={false}
+                      name="remember"
+                    />
+                    Remember me
+                  </label>
 
-              <button
-                type="button"
-                onClick={() => setTab("forgot")}
-                className="text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-              >
-                Forgot password?
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab("forgot")}
+                    className="text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
 
-            <Button
-              type="submit"
-              disabled={pendingForTab}
-              className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
-            >
-              {loginPending ? "Signing in..." : "Sign In →"}
-            </Button>
+                <Button
+                  type="submit"
+                  disabled={pendingForTab}
+                  className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
+                >
+                  {loginPending
+                    ? "Signing in..."
+                    : role === "admin"
+                      ? "Sign in as Admin →"
+                      : "Sign in as Brand Owner →"}
+                </Button>
 
-            <Divider />
-
-            <SocialAuthButtons />
-
-            <p className="pt-2 text-xs leading-relaxed text-slate-500">
-              By continuing, you agree to our{" "}
-              <Link
-                href="#"
-                className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                href="#"
-                className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
+                <p className="pt-2 text-xs leading-relaxed text-slate-500">
+                  By continuing, you agree to our{" "}
+                  <Link
+                    href="#"
+                    className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                  >
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="#"
+                    className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </p>
               </form>
             ) : null}
 
             {tab === "signup" ? (
-              <form action={signupAction} className="space-y-4">
-                <AuthAlert
-                  error={
-                    signupState.error &&
-                    !isAccountLevelFormError(signupState.error)
-                      ? signupState.error
-                      : null
-                  }
-                  message={signupState.message}
-                />
+              role === "admin" ? (
+                <AdminSignupNotice onSwitchToLogin={() => setTab("login")} />
+              ) : (
+                <form action={signupAction} className="space-y-4">
+                  <input type="hidden" name="expectedRole" value="client" />
 
-                <PremiumInput
-                  label="Full name"
-                  name="fullName"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  placeholder="Jane Smith"
-                  error={getFieldFormError(signupState.error, "fullName")}
-                />
+                  <AuthAlert
+                    error={
+                      signupState.error &&
+                      !isAccountLevelFormError(signupState.error)
+                        ? signupState.error
+                        : null
+                    }
+                    message={signupState.message}
+                  />
 
-                <PremiumInput
-                  label="Email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="e.g. you@company.com"
-                  error={getFieldFormError(signupState.error, "email")}
-                />
+                  <PremiumInput
+                    label="Full name"
+                    name="fullName"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    placeholder="Jane Smith"
+                    error={getFieldFormError(signupState.error, "fullName")}
+                  />
 
-                <PremiumInput
-                  label="Password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  placeholder="At least 8 characters"
-                  error={getFieldFormError(signupState.error, "password")}
-                />
+                  <PremiumInput
+                    label="Email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    placeholder="e.g. you@brand.com"
+                    error={getFieldFormError(signupState.error, "email")}
+                  />
 
-            <Button
-              type="submit"
-              disabled={pendingForTab}
-              className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
-            >
-              {signupPending ? "Creating account..." : "Create account"}
-            </Button>
-              </form>
+                  <PremiumInput
+                    label="Password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    placeholder="At least 8 characters"
+                    error={getFieldFormError(signupState.error, "password")}
+                  />
+
+                  <Button
+                    type="submit"
+                    disabled={pendingForTab}
+                    className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
+                  >
+                    {signupPending ? "Creating account..." : "Create Brand Owner account"}
+                  </Button>
+                </form>
+              )
             ) : null}
 
             {tab === "forgot" ? (
@@ -296,26 +386,49 @@ export function AuthExperience({
                   error={getFieldFormError(forgotState.error, "email")}
                 />
 
-            <Button
-              type="submit"
-              disabled={pendingForTab}
-              className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
-            >
-              {forgotPending ? "Sending link..." : "Send reset link"}
-            </Button>
+                <Button
+                  type="submit"
+                  disabled={pendingForTab}
+                  className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
+                >
+                  {forgotPending ? "Sending link..." : "Send reset link"}
+                </Button>
 
-            <button
-              type="button"
-              onClick={() => setTab("login")}
-              className="w-full text-center text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
-            >
-              Back to sign in
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("login")}
+                  className="w-full text-center text-sm font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                >
+                  Back to sign in
+                </button>
               </form>
             ) : null}
           </div>
         </>
       )}
+    </motion.div>
+  );
+}
+
+function AdminSignupNotice({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-[16px] border border-slate-200/80 bg-slate-50/80 px-4 py-5 text-sm text-slate-600"
+    >
+      <p className="font-semibold text-slate-900">Admin access is provisioned</p>
+      <p className="mt-2 leading-relaxed">
+        Admin accounts are created by the iFranchise team. If you already have
+        credentials, switch to Sign In and select Admin.
+      </p>
+      <button
+        type="button"
+        onClick={onSwitchToLogin}
+        className="mt-4 text-sm font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
+      >
+        Go to admin sign in →
+      </button>
     </motion.div>
   );
 }
@@ -346,14 +459,3 @@ function TabButton({
     </motion.button>
   );
 }
-
-function Divider() {
-  return (
-    <div className="flex items-center gap-3 pt-2">
-      <div className="h-px flex-1 bg-slate-200" />
-      <div className="text-xs font-semibold text-slate-400">OR</div>
-      <div className="h-px flex-1 bg-slate-200" />
-    </div>
-  );
-}
-

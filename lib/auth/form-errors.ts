@@ -11,7 +11,15 @@ export function isAccountLevelFormError(error: string | null | undefined): boole
     lower.includes("disabled") ||
     lower.includes("contact support") ||
     lower.includes("authentication service") ||
-    lower.includes("authentication failed")
+    lower.includes("authentication failed") ||
+    lower.includes("admin access") ||
+    lower.includes("brand owner") ||
+    lower.includes("sign in as") ||
+    lower.includes("profile record not found") ||
+    lower.includes("unable to connect") ||
+    lower.includes("network connection") ||
+    lower.includes("authentication service") ||
+    lower.includes("not configured")
   );
 }
 

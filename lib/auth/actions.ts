@@ -12,15 +12,45 @@ import {
   getAuthErrorMessage,
 } from "@/lib/auth/auth-errors";
 import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
+import {
+  humanizeAuthError,
+  profileLoadErrorMessage,
+  unavailableAuthState,
+} from "@/lib/auth/humanize-error";
+import { authDebug } from "@/lib/auth/profile";
 import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
-import { createClient } from "@/lib/supabase/server";
+import { verifySupabaseConnectivity } from "@/lib/supabase/connectivity";
+import { getSupabaseEnvStatus } from "@/lib/supabase/env";
+import { createClientOptional } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/types/auth";
 
-function networkErrorState(): AuthActionState {
+function envErrorState(): AuthActionState {
+  const status = getSupabaseEnvStatus();
   return {
-    error: getAuthErrorMessage(AUTH_ERROR_CODES.unavailable),
+    error:
+      status.issues[0] ??
+      "Authentication is not configured. Check environment variables.",
     message: null,
   };
+}
+
+async function preflightAuth(): Promise<AuthActionState | null> {
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    return envErrorState();
+  }
+
+  const connectivity = await verifySupabaseConnectivity();
+  if (!connectivity.ok) {
+    authDebug("connectivity-failed", {
+      error: connectivity.error,
+      latencyMs: connectivity.latencyMs,
+    });
+    return unavailableAuthState();
+  }
+
+  authDebug("connectivity-ok", { latencyMs: connectivity.latencyMs });
+  return null;
 }
 
 async function getOrigin(): Promise<string> {
@@ -50,6 +80,21 @@ function resolveRedirectPath(
   return getRedirectPathForRole(role);
 }
 
+function parseExpectedRole(formData: FormData): "client" | "admin" | null {
+  const raw = String(formData.get("expectedRole") ?? "").trim();
+  if (raw === "client" || raw === "admin") {
+    return raw;
+  }
+  return null;
+}
+
+function roleMismatchMessage(expected: "client" | "admin"): string {
+  if (expected === "admin") {
+    return "This account does not have admin access. Sign in as Brand Owner instead.";
+  }
+  return "This account is not a brand owner. Sign in as Admin instead.";
+}
+
 export async function login(
   _prevState: AuthActionState,
   formData: FormData,
@@ -57,34 +102,82 @@ export async function login(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "").trim() || null;
+  const expectedRole = parseExpectedRole(formData);
 
   if (!email || !password) {
     return { error: "Email and password are required.", message: null };
   }
 
+  if (!expectedRole) {
+    return { error: "Please select Brand Owner or Admin.", message: null };
+  }
+
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return preflight;
+  }
+
   try {
-    const supabase = await createClient();
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return envErrorState();
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      return { error: error.message, message: null };
+      authDebug("login-auth-error", {
+        message: error.message,
+        code: error.code,
+      });
+      return { error: humanizeAuthError(error), message: null };
     }
 
-    const profile = await ensureProfileForUser(data.user);
+    if (!data.user) {
+      return { error: "Authentication failed. Please try again.", message: null };
+    }
+
+    authDebug("login-auth-ok", { userId: data.user.id, expectedRole });
+
+    const profile = await ensureProfileForUser(data.user, supabase);
     if (!profile) {
+      await supabase.auth.signOut();
+      authDebug("login-profile-missing", { userId: data.user.id });
       return {
         error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
         message: null,
       };
     }
 
-    redirect(resolveRedirectPath(profile.role, redirectTo));
+    if (profile.role !== expectedRole) {
+      await supabase.auth.signOut();
+      authDebug("login-role-mismatch", {
+        userId: data.user.id,
+        expectedRole,
+        actualRole: profile.role,
+      });
+      return { error: roleMismatchMessage(expectedRole), message: null };
+    }
+
+    const destination = resolveRedirectPath(profile.role, redirectTo);
+
+    authDebug("login-redirect", {
+      userId: data.user.id,
+      profileId: profile.id,
+      role: profile.role,
+      destination,
+    });
+
+    redirect(destination);
   } catch (error) {
     if (isServiceUnavailableError(error)) {
-      return networkErrorState();
+      authDebug("login-network-error", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return unavailableAuthState();
     }
     throw error;
   }
@@ -97,6 +190,14 @@ export async function signup(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const expectedRole = parseExpectedRole(formData);
+
+  if (expectedRole === "admin") {
+    return {
+      error: "Admin accounts are provisioned by the iFranchise team.",
+      message: null,
+    };
+  }
 
   if (!fullName || !email || !password) {
     return {
@@ -112,8 +213,17 @@ export async function signup(
     };
   }
 
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return preflight;
+  }
+
   try {
-    const supabase = await createClient();
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return envErrorState();
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -123,7 +233,7 @@ export async function signup(
     });
 
     if (error) {
-      return { error: error.message, message: null };
+      return { error: humanizeAuthError(error), message: null };
     }
 
     if (!data.user) {
@@ -138,12 +248,21 @@ export async function signup(
       };
     }
 
-    const profile = await ensureProfileForUser(data.user);
+    const profile = await ensureProfileForUser(data.user, supabase);
     const role = profile?.role ?? "client";
-    redirect(getRedirectPathForRole(role));
+    const destination = getRedirectPathForRole(role);
+
+    authDebug("signup-redirect", {
+      userId: data.user.id,
+      profileId: profile?.id ?? null,
+      role,
+      destination,
+    });
+
+    redirect(destination);
   } catch (error) {
     if (isServiceUnavailableError(error)) {
-      return networkErrorState();
+      return unavailableAuthState();
     }
     throw error;
   }
@@ -159,15 +278,24 @@ export async function forgotPassword(
     return { error: "Email is required.", message: null };
   }
 
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return preflight;
+  }
+
   try {
-    const supabase = await createClient();
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return envErrorState();
+    }
+
     const origin = await getOrigin();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${origin}/auth/callback?next=/login`,
     });
 
     if (error) {
-      return { error: error.message, message: null };
+      return { error: humanizeAuthError(error), message: null };
     }
 
     return {
@@ -177,7 +305,7 @@ export async function forgotPassword(
     };
   } catch (error) {
     if (isServiceUnavailableError(error)) {
-      return networkErrorState();
+      return unavailableAuthState();
     }
     throw error;
   }
@@ -189,39 +317,63 @@ export async function repairAccount(
 ): Promise<AuthActionState> {
   const redirectTo = String(formData.get("redirectTo") ?? "").trim() || null;
 
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return preflight;
+  }
+
   try {
-    const supabase = await createClient();
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return envErrorState();
+    }
+
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser();
 
-    if (error || !user) {
+    if (error) {
+      return { error: humanizeAuthError(error), message: null };
+    }
+
+    if (!user) {
       return {
         error: getAuthErrorMessage(AUTH_ERROR_CODES.auth),
         message: null,
       };
     }
 
-    const profile = await ensureProfileForUser(user);
+    const profile = await ensureProfileForUser(user, supabase);
     if (!profile) {
       return {
-        error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
+        error: profileLoadErrorMessage("Profile record not found."),
         message: null,
       };
     }
 
-    redirect(resolveRedirectPath(profile.role, redirectTo));
+    const destination = resolveRedirectPath(profile.role, redirectTo);
+
+    authDebug("repair-redirect", {
+      userId: user.id,
+      profileId: profile.id,
+      role: profile.role,
+      destination,
+    });
+
+    redirect(destination);
   } catch (error) {
     if (isServiceUnavailableError(error)) {
-      return networkErrorState();
+      return unavailableAuthState();
     }
     throw error;
   }
 }
 
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const supabase = await createClientOptional();
+  if (supabase) {
+    await supabase.auth.signOut();
+  }
   redirect("/login");
 }

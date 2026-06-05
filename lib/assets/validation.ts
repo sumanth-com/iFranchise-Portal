@@ -1,12 +1,16 @@
 import { MAX_ASSET_SIZE_BYTES } from "@/lib/assets/constants";
+import type { AssetType } from "@/types/assets";
 
-const ALLOWED_MIME_TYPES = new Set([
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
 ]);
 
-const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set(["application/pdf"]);
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set([".pdf"]);
 
 export function getFileExtension(fileName: string): string {
   const dot = fileName.lastIndexOf(".");
@@ -26,12 +30,33 @@ export function validateImageFile(file: File): string | null {
   }
 
   const extension = getFileExtension(file.name);
-  if (!ALLOWED_EXTENSIONS.has(extension)) {
+  if (!ALLOWED_IMAGE_EXTENSIONS.has(extension)) {
     return "Only JPG, PNG, and WEBP images are allowed.";
   }
 
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
     return "Only JPG, PNG, and WEBP images are allowed.";
+  }
+
+  return null;
+}
+
+export function validateDocumentFile(file: File): string | null {
+  if (!(file instanceof File) || file.size === 0) {
+    return "Please select a PDF file.";
+  }
+
+  if (file.size > MAX_ASSET_SIZE_BYTES) {
+    return "Document must be 5MB or smaller.";
+  }
+
+  const extension = getFileExtension(file.name);
+  if (!ALLOWED_DOCUMENT_EXTENSIONS.has(extension)) {
+    return "Only PDF documents are allowed.";
+  }
+
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type) && file.type !== "") {
+    return "Only PDF documents are allowed.";
   }
 
   return null;
@@ -40,7 +65,7 @@ export function validateImageFile(file: File): string | null {
 export function buildStoragePath(
   userId: string,
   brandId: string,
-  assetType: "logo" | "gallery",
+  assetType: AssetType,
   fileName: string,
 ): string {
   const extension = getFileExtension(fileName) || ".jpg";

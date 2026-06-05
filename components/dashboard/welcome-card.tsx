@@ -31,7 +31,7 @@ export function WelcomeCard({ name, subtitle, showCta = true }: WelcomeCardProps
         <p className="mt-2 max-w-lg text-sm text-white/85 sm:text-base">{subtitle}</p>
         {showCta ? (
           <Link
-            href="#profile"
+            href="/dashboard/onboarding?step=1"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-primary-700 shadow-sm transition-transform hover:scale-[1.02]"
           >
             Continue setup

@@ -13,11 +13,14 @@ import {
   isProtectedPath,
   PROTECTED_PATHS,
 } from "@/lib/auth/paths";
+import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
+import { authDebug, isDisabledStaffGate } from "@/lib/auth/profile";
 import {
   isServiceUnavailableError,
   resolveUserFromGetUser,
 } from "@/lib/auth/resolve-auth";
 import type { UserRole } from "@/types/auth";
+import type { TeamRole } from "@/types/team";
 
 import { getSupabaseEnv } from "./env";
 import { fetchWithTimeout } from "./fetch";
@@ -25,7 +28,7 @@ import { fetchWithTimeout } from "./fetch";
 type ProfileGate = {
   role: UserRole;
   is_active: boolean;
-  team_role: string | null;
+  team_role: TeamRole | null;
 };
 
 function createMiddlewareClient(request: NextRequest) {
@@ -88,21 +91,35 @@ async function loadProfileGate(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
 ): Promise<ProfileGate | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("role, is_active, team_role")
-    .eq("id", userId)
-    .maybeSingle();
+  try {
+    const { profile, error } = await fetchProfileByUserId(supabase, userId);
 
-  if (error || !data) {
+    if (!profile) {
+      authDebug("middleware-profile-missing", { userId, error });
+      return null;
+    }
+
+    authDebug("middleware-profile-ok", {
+      userId,
+      profileId: profile.id,
+      role: profile.role,
+    });
+
+    return {
+      role: profile.role,
+      is_active: profile.is_active,
+      team_role: profile.team_role,
+    };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      throw error;
+    }
+    authDebug("middleware-profile-error", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
-
-  return {
-    role: (data.role as UserRole) ?? "client",
-    is_active: data.is_active ?? true,
-    team_role: data.team_role ?? null,
-  };
 }
 
 export async function updateSession(request: NextRequest) {
@@ -163,6 +180,10 @@ export async function updateSession(request: NextRequest) {
     }
 
     user = resolved.user;
+    authDebug("middleware-user", {
+      userId: user?.id ?? null,
+      pathname,
+    });
   } catch (error) {
     if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
       return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
@@ -211,11 +232,8 @@ export async function updateSession(request: NextRequest) {
 
   const role = profile?.role ?? "client";
 
-  // Disabled admin account
-  if (
-    profile?.role === "admin" &&
-    (profile.is_active === false || !profile.team_role)
-  ) {
+  // Disabled staff account (only when team_role is set — migration 004)
+  if (profile && isDisabledStaffGate(profile)) {
     if (isAuthPath(pathname) && authError === AUTH_ERROR_CODES.disabled) {
       return getResponse();
     }

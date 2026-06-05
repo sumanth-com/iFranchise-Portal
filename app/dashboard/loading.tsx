@@ -1,15 +1,15 @@
 export default function DashboardLoading() {
   return (
-    <div className="space-y-8 animate-pulse" aria-busy="true" aria-label="Loading dashboard">
-      <div className="h-36 rounded-2xl bg-slate-100" />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="h-24 rounded-2xl bg-slate-100" />
-        <div className="h-24 rounded-2xl bg-slate-100" />
-        <div className="h-24 rounded-2xl bg-slate-100" />
+    <div className="animate-pulse space-y-6 text-black">
+      <div className="h-48 rounded-3xl border border-neutral-200 bg-white" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-24 rounded-2xl border border-neutral-200 bg-white" />
+        ))}
       </div>
-      <div className="grid gap-8 xl:grid-cols-5">
-        <div className="h-96 rounded-2xl bg-slate-100 xl:col-span-3" />
-        <div className="h-96 rounded-2xl bg-slate-100 xl:col-span-2" />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="h-80 rounded-2xl border border-neutral-200 bg-white" />
+        <div className="h-80 rounded-2xl border border-neutral-200 bg-white" />
       </div>
     </div>
   );

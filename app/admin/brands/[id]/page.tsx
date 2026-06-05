@@ -75,7 +75,14 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
             {brand.owner_email}
           </p>
         </div>
-        <BrandStatusBadge status={brand.status} pulse={brand.status === "submitted"} />
+        <div className="flex flex-wrap items-center gap-2">
+          <BrandStatusBadge status={brand.status} pulse={brand.status === "submitted"} />
+          {brand.publish_ready ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              Publish ready
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-8 xl:grid-cols-5">
@@ -86,10 +93,87 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
               <DetailField label="Business name" value={brand.business_name} />
               <DetailField label="Tagline" value={brand.tagline} />
               <DetailField label="Industry" value={brand.industry} />
+              <DetailField label="Category" value={brand.category} />
               <DetailField label="Description" value={brand.description} />
               <DetailField label="Website" value={brand.website_url} />
               <DetailField label="Contact email" value={brand.contact_email} />
               <DetailField label="Contact phone" value={brand.contact_phone} />
+            </dl>
+          </Card>
+
+          <Card padding="lg">
+            <h3 className="text-base font-semibold text-foreground">Investment & franchise</h3>
+            <dl className="mt-4">
+              <DetailField
+                label="Investment range"
+                value={
+                  brand.investment_min != null
+                    ? `₹${brand.investment_min}${brand.investment_max != null ? ` – ₹${brand.investment_max}` : ""}`
+                    : null
+                }
+              />
+              <DetailField
+                label="Franchise fee"
+                value={brand.franchise_fee != null ? `₹${brand.franchise_fee}` : null}
+              />
+              <DetailField
+                label="Space required"
+                value={
+                  brand.space_required_sqft != null
+                    ? `${brand.space_required_sqft} sq ft`
+                    : null
+                }
+              />
+              <DetailField
+                label="ROI"
+                value={brand.roi_percent != null ? `${brand.roi_percent}%` : null}
+              />
+              <DetailField
+                label="Payback period"
+                value={
+                  brand.payback_period_months != null
+                    ? `${brand.payback_period_months} months`
+                    : null
+                }
+              />
+              <DetailField
+                label="Franchise models"
+                value={brand.franchise_models?.join(", ")}
+              />
+              <DetailField
+                label="Current outlets"
+                value={brand.current_outlets?.toString()}
+              />
+              <DetailField
+                label="Existing cities"
+                value={brand.existing_cities?.join(", ")}
+              />
+            </dl>
+          </Card>
+
+          <Card padding="lg">
+            <h3 className="text-base font-semibold text-foreground">Expansion & agreement</h3>
+            <dl className="mt-4">
+              <DetailField label="Target cities" value={brand.target_cities?.join(", ")} />
+              <DetailField label="Tier 1" value={brand.expansion_tier_1?.join(", ")} />
+              <DetailField label="Tier 2" value={brand.expansion_tier_2?.join(", ")} />
+              <DetailField label="Metro" value={brand.expansion_metro?.join(", ")} />
+              <DetailField
+                label="Agreement term"
+                value={
+                  brand.agreement_term_years != null
+                    ? `${brand.agreement_term_years} years`
+                    : null
+                }
+              />
+              <DetailField
+                label="Lock-in period"
+                value={
+                  brand.lock_in_period_months != null
+                    ? `${brand.lock_in_period_months} months`
+                    : null
+                }
+              />
             </dl>
           </Card>
 

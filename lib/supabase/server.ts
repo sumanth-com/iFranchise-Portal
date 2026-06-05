@@ -2,13 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { assertSupabaseEnv, getSupabaseEnv } from "./env";
-import { fetchWithTimeout } from "./fetch";
+import { fetchWithTimeoutServer } from "./fetch-server";
 
 async function buildServerClient(url: string, publishableKey: string) {
   const cookieStore = await cookies();
 
   return createServerClient(url, publishableKey, {
-    global: { fetch: fetchWithTimeout },
+    global: { fetch: fetchWithTimeoutServer },
     cookies: {
       getAll() {
         return cookieStore.getAll();

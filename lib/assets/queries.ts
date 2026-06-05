@@ -22,6 +22,16 @@ async function attachSignedUrl(
   };
 }
 
+function emptyBundle(): BrandAssetsBundle {
+  return {
+    logo: null,
+    gallery: [],
+    storePhotos: [],
+    productPhotos: [],
+    documents: [],
+  };
+}
+
 export async function getBrandAssets(
   brandId: string,
 ): Promise<{ assets: BrandAssetsBundle; error: string | null }> {
@@ -34,7 +44,7 @@ export async function getBrandAssets(
 
   if (error) {
     return {
-      assets: { logo: null, gallery: [] },
+      assets: emptyBundle(),
       error: "Unable to load brand assets. Please refresh and try again.",
     };
   }
@@ -46,6 +56,9 @@ export async function getBrandAssets(
     assets: {
       logo: withUrls.find((a) => a.asset_type === "logo") ?? null,
       gallery: withUrls.filter((a) => a.asset_type === "gallery"),
+      storePhotos: withUrls.filter((a) => a.asset_type === "store_photo"),
+      productPhotos: withUrls.filter((a) => a.asset_type === "product_photo"),
+      documents: withUrls.filter((a) => a.asset_type === "document"),
     },
     error: null,
   };

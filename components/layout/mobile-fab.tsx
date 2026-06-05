@@ -13,7 +13,7 @@ export function MobileFab() {
       transition={{ delay: 0.3, type: "spring", stiffness: 400, damping: 22 }}
     >
       <Link
-        href="#profile"
+        href="/dashboard/onboarding?step=1"
         className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6D28D9] to-[#A78BFA] text-white shadow-[var(--shadow-glow)]"
         aria-label="Continue brand profile"
       >

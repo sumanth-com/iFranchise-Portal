@@ -42,6 +42,53 @@
   --sidebar-width: 16rem;
   --sidebar-collapsed: 4.5rem;
   --topbar-height: 3.5rem;
+
+  /* Brand Owner dashboard — white background, pure black text */
+  --dash-bg: #ffffff;
+  --dash-surface: #ffffff;
+  --dash-surface-elevated: #ffffff;
+  --dash-border: #e0e0e0;
+  --dash-text: #000000;
+  --dash-muted: #000000;
+}
+
+/* Brand Owner dashboard — force white bg + black text (no purple/dark theme) */
+[data-dashboard="client"] {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+[data-dashboard="client"] .dash-card {
+  background-color: #ffffff;
+  color: #000000;
+  border-color: #e0e0e0;
+}
+
+[data-dashboard="client"] :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  label,
+  li,
+  a,
+  button,
+  input,
+  textarea,
+  select
+) {
+  color: #000000;
+}
+
+[data-dashboard="client"] :where(a, button)[class*="bg-black"] {
+  color: #ffffff;
+}
+
+[data-dashboard="client"] :where(svg, path) {
+  color: inherit;
+  stroke: currentColor;
 }
 
 @theme inline {

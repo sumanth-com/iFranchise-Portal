@@ -2,6 +2,8 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { AUTH_ERROR_CODES } from "@/lib/auth/auth-errors";
+import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
+import { authDebug, isDisabledStaffProfile } from "@/lib/auth/profile";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClientOptional } from "@/lib/supabase/server";
 import {
@@ -15,9 +17,6 @@ import {
 import { canManageTeam } from "@/lib/team/permissions";
 import type { Profile, UserRole } from "@/types/auth";
 import type { TeamRole } from "@/types/team";
-
-const PROFILE_FIELDS =
-  "id, email, full_name, role, team_role, is_active, created_at, updated_at";
 
 function redirectToLogin(error: string): never {
   redirect(`/login?error=${error}`);
@@ -39,6 +38,13 @@ export const getUser = cache(async () => {
     } = await supabase.auth.getUser();
 
     const resolved = resolveUserFromGetUser(user, error);
+
+    authDebug("get-user", {
+      userId: resolved.user?.id ?? null,
+      unavailable: resolved.unavailable,
+      error: error?.message ?? null,
+    });
+
     if (resolved.unavailable) {
       return null;
     }
@@ -54,21 +60,20 @@ export const getProfileByUserId = cache(
     try {
       const supabase = await createClientOptional();
       if (!supabase) {
+        authDebug("profile-skip", { userId, reason: "no-client" });
         return null;
       }
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(PROFILE_FIELDS)
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error || !data) {
-        return null;
+      const { profile, error } = await fetchProfileByUserId(supabase, userId);
+      if (!profile && error) {
+        authDebug("profile-null", { userId, error });
       }
-
-      return data as Profile;
-    } catch {
+      return profile;
+    } catch (error) {
+      authDebug("profile-exception", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   },
@@ -109,6 +114,7 @@ export async function requireUser() {
       redirectToLogin(AUTH_ERROR_CODES.auth);
     }
 
+    authDebug("require-user", { userId: resolved.user.id });
     return resolved.user;
   } catch (error) {
     if (isServiceUnavailableError(error)) {
@@ -123,8 +129,19 @@ export async function requireProfile() {
   const profile = await getProfileByUserId(user.id);
 
   if (!profile) {
+    authDebug("require-profile-failed", {
+      userId: user.id,
+      redirect: `/login?error=${AUTH_ERROR_CODES.profile}`,
+    });
     redirectToLogin(AUTH_ERROR_CODES.profile);
   }
+
+  authDebug("require-profile", {
+    userId: user.id,
+    profileId: profile.id,
+    role: profile.role,
+    redirect: getRedirectPathForRole(profile.role),
+  });
 
   return profile;
 }
@@ -142,7 +159,7 @@ export async function requireAdmin() {
   if (profile.role !== "admin") {
     redirect(PROTECTED_PATHS.client);
   }
-  if (!profile.is_active || !profile.team_role) {
+  if (isDisabledStaffProfile(profile)) {
     redirectToLogin(AUTH_ERROR_CODES.disabled);
   }
   return profile;

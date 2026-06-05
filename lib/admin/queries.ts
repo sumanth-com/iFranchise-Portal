@@ -83,13 +83,17 @@ export async function getAdminBrandById(
     return { brand: null, error: null };
   }
 
-  const { profiles, ...brand } = data;
+  const row = data as unknown as {
+    profiles: ProfileEmbed | ProfileEmbed[];
+  } & Omit<AdminBrandDetail, "owner_email" | "owner_name">;
+
+  const { profiles, ...brand } = row;
 
   return {
     brand: {
-      ...(brand as Omit<AdminBrandDetail, "owner_email" | "owner_name">),
-      owner_email: getOwnerEmail(profiles as ProfileEmbed | ProfileEmbed[]),
-      owner_name: getOwnerName(profiles as ProfileEmbed | ProfileEmbed[]),
+      ...brand,
+      owner_email: getOwnerEmail(profiles),
+      owner_name: getOwnerName(profiles),
     },
     error: null,
   };

@@ -30,11 +30,11 @@ export function getAuthErrorMessage(error: string | null | undefined): string | 
     case AUTH_ERROR_CODES.auth:
       return "Authentication failed. Please try again.";
     case AUTH_ERROR_CODES.profile:
-      return "Your profile could not be loaded. Please sign out and contact support if this continues.";
+      return "Profile record not found. Try repairing your account or contact support.";
     case AUTH_ERROR_CODES.disabled:
       return "Your account is disabled. Contact an administrator.";
     case AUTH_ERROR_CODES.unavailable:
-      return "We could not reach the authentication service. Check your connection and try again.";
+      return "Unable to connect to authentication service. Please try again.";
     default:
       return null;
   }

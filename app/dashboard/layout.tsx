@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 
-import { AppShell } from "@/components/layout/app-shell";
-import { requireClient } from "@/lib/auth/session";
-import { clientNav } from "@/lib/nav-config";
+import { ClientShell } from "@/components/dashboard/client/client-shell";
+import { getDashboardContext } from "@/lib/dashboard/context";
 import { getGreeting } from "@/lib/utils";
 
 export default async function DashboardLayout({
@@ -10,18 +9,17 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const profile = await requireClient();
+  const { profile, sections } = await getDashboardContext();
 
   return (
-    <AppShell
-      navItems={clientNav}
-      title="Dashboard"
+    <ClientShell
+      title="Brand Portal"
       subtitle={getGreeting(profile.full_name)}
       email={profile.email}
       name={profile.full_name}
-      role="client"
+      sections={sections}
     >
       {children}
-    </AppShell>
+    </ClientShell>
   );
 }

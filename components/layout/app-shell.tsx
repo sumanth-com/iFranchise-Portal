@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 
 import { MobileFab } from "@/components/layout/mobile-fab";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -34,11 +34,13 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh bg-white">
-      <Sidebar
-        items={navItems}
-        collapsed={collapsed}
-        onToggle={() => setCollapsed((v) => !v)}
-      />
+      <Suspense fallback={null}>
+        <Sidebar
+          items={navItems}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((v) => !v)}
+        />
+      </Suspense>
       <div className="flex min-w-0 flex-1 flex-col pb-20 lg:pb-0">
         <TopBar
           title={title}
@@ -54,7 +56,9 @@ export function AppShell({
           </div>
         </main>
       </div>
-      <MobileNav items={navItems} />
+      <Suspense fallback={null}>
+        <MobileNav items={navItems} />
+      </Suspense>
       {role === "client" ? <MobileFab /> : null}
     </div>
   );

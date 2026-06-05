@@ -1,0 +1,267 @@
+import { createServerClient } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
+
+import {
+  AUTH_ERROR_CODES,
+  isBlockingAuthError,
+} from "@/lib/auth/auth-errors";
+import { hasSupabaseAuthCookies } from "@/lib/auth/cookies";
+import {
+  AUTH_PATHS,
+  getRedirectPathForRole,
+  isAuthPath,
+  isProtectedPath,
+  PROTECTED_PATHS,
+} from "@/lib/auth/paths";
+import {
+  isServiceUnavailableError,
+  resolveUserFromGetUser,
+} from "@/lib/auth/resolve-auth";
+import type { UserRole } from "@/types/auth";
+
+import { getSupabaseEnv } from "./env";
+import { fetchWithTimeout } from "./fetch";
+
+type ProfileGate = {
+  role: UserRole;
+  is_active: boolean;
+  team_role: string | null;
+};
+
+function createMiddlewareClient(request: NextRequest) {
+  const { url, publishableKey } = getSupabaseEnv();
+
+  if (!url || !publishableKey) {
+    return null;
+  }
+
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(url, publishableKey, {
+    global: { fetch: fetchWithTimeout },
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => {
+          request.cookies.set(name, value);
+        });
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          supabaseResponse.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  return { supabase, getResponse: () => supabaseResponse };
+}
+
+function redirectToLogin(
+  request: NextRequest,
+  error?: string,
+  redirectTo?: string,
+) {
+  const loginUrl = request.nextUrl.clone();
+  loginUrl.pathname = AUTH_PATHS.login;
+  loginUrl.search = "";
+
+  if (error) {
+    loginUrl.searchParams.set("error", error);
+  }
+  if (redirectTo) {
+    loginUrl.searchParams.set("redirectTo", redirectTo);
+  }
+
+  return NextResponse.redirect(loginUrl);
+}
+
+function redirectToApp(request: NextRequest, pathname: string) {
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = pathname;
+  redirectUrl.search = "";
+  return NextResponse.redirect(redirectUrl);
+}
+
+async function loadProfileGate(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<ProfileGate | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role, is_active, team_role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    role: (data.role as UserRole) ?? "client",
+    is_active: data.is_active ?? true,
+    team_role: data.team_role ?? null,
+  };
+}
+
+export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const authError = request.nextUrl.searchParams.get("error");
+
+  // OAuth callback must run without middleware redirects or extra auth calls.
+  if (pathname.startsWith("/auth/callback")) {
+    return NextResponse.next({ request });
+  }
+
+  // Fast path: user is already on login with a service error — don't block
+  // the page for another slow Supabase round-trip on every refresh.
+  if (isAuthPath(pathname) && authError === AUTH_ERROR_CODES.unavailable) {
+    return NextResponse.next({ request });
+  }
+
+  const client = createMiddlewareClient(request);
+  if (!client) {
+    if (isProtectedPath(pathname)) {
+      return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+    }
+    if (pathname === "/") {
+      return redirectToLogin(request);
+    }
+    return NextResponse.next({ request });
+  }
+
+  const { supabase, getResponse } = client;
+  const hasAuthCookies = hasSupabaseAuthCookies(request);
+
+  // No session cookies — skip Supabase auth call entirely.
+  if (!hasAuthCookies) {
+    if (isProtectedPath(pathname)) {
+      return redirectToLogin(request, undefined, pathname);
+    }
+    if (pathname === "/") {
+      return redirectToLogin(request);
+    }
+    return getResponse();
+  }
+
+  let user: { id: string } | null = null;
+
+  try {
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabase.auth.getUser();
+
+    const resolved = resolveUserFromGetUser(authUser, error);
+
+    if (resolved.unavailable) {
+      if (isProtectedPath(pathname)) {
+        return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+      }
+      return getResponse();
+    }
+
+    user = resolved.user;
+  } catch (error) {
+    if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
+      return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+    }
+
+    // Unknown failures — treat as logged out, never loop on "unavailable".
+    if (isProtectedPath(pathname)) {
+      return redirectToLogin(request, undefined, pathname);
+    }
+    return getResponse();
+  }
+
+  // --- Unauthenticated ---
+  if (!user) {
+    if (isProtectedPath(pathname)) {
+      return redirectToLogin(request, undefined, pathname);
+    }
+    if (pathname === "/") {
+      return redirectToLogin(request);
+    }
+    return getResponse();
+  }
+
+  // --- Authenticated: resolve profile once per request ---
+  let profile: ProfileGate | null = null;
+
+  const needsProfile =
+    isProtectedPath(pathname) ||
+    isAuthPath(pathname) ||
+    pathname === "/" ||
+    pathname.startsWith(PROTECTED_PATHS.admin);
+
+  if (needsProfile) {
+    try {
+      profile = await loadProfileGate(supabase, user.id);
+    } catch (error) {
+      if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
+        return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+      }
+      if (isProtectedPath(pathname)) {
+        return redirectToLogin(request, AUTH_ERROR_CODES.profile, pathname);
+      }
+      return getResponse();
+    }
+  }
+
+  const role = profile?.role ?? "client";
+
+  // Disabled admin account
+  if (
+    profile?.role === "admin" &&
+    (profile.is_active === false || !profile.team_role)
+  ) {
+    if (isAuthPath(pathname) && authError === AUTH_ERROR_CODES.disabled) {
+      return getResponse();
+    }
+    return redirectToLogin(request, AUTH_ERROR_CODES.disabled);
+  }
+
+  // Missing profile row — critical loop fix:
+  // NEVER bounce authenticated users away from /login when profile is missing.
+  if (!profile) {
+    if (isAuthPath(pathname) || pathname === "/") {
+      return getResponse();
+    }
+
+    if (isProtectedPath(pathname)) {
+      return redirectToLogin(request, AUTH_ERROR_CODES.profile, pathname);
+    }
+
+    return getResponse();
+  }
+
+  // Home: send authenticated users straight to their dashboard.
+  if (pathname === "/") {
+    return redirectToApp(request, getRedirectPathForRole(role));
+  }
+
+  // Auth pages: only redirect into the app when profile is valid and no blocking error.
+  if (isAuthPath(pathname)) {
+    if (isBlockingAuthError(authError)) {
+      return getResponse();
+    }
+
+    return redirectToApp(request, getRedirectPathForRole(role));
+  }
+
+  // Role-based route protection
+  if (pathname.startsWith(PROTECTED_PATHS.admin) && role !== "admin") {
+    return redirectToApp(request, PROTECTED_PATHS.client);
+  }
+
+  if (
+    (pathname === PROTECTED_PATHS.client ||
+      pathname.startsWith(`${PROTECTED_PATHS.client}/`)) &&
+    role === "admin"
+  ) {
+    return redirectToApp(request, PROTECTED_PATHS.admin);
+  }
+
+  return getResponse();
+}

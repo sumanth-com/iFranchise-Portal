@@ -12,8 +12,16 @@ import {
   getAuthErrorMessage,
 } from "@/lib/auth/auth-errors";
 import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
+import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/types/auth";
+
+function networkErrorState(): AuthActionState {
+  return {
+    error: getAuthErrorMessage(AUTH_ERROR_CODES.unavailable),
+    message: null,
+  };
+}
 
 async function getOrigin(): Promise<string> {
   const headersList = await headers();
@@ -54,25 +62,32 @@ export async function login(
     return { error: "Email and password are required.", message: null };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) {
-    return { error: error.message, message: null };
+    if (error) {
+      return { error: error.message, message: null };
+    }
+
+    const profile = await ensureProfileForUser(data.user);
+    if (!profile) {
+      return {
+        error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
+        message: null,
+      };
+    }
+
+    redirect(resolveRedirectPath(profile.role, redirectTo));
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return networkErrorState();
+    }
+    throw error;
   }
-
-  const profile = await ensureProfileForUser(data.user);
-  if (!profile) {
-    return {
-      error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
-      message: null,
-    };
-  }
-
-  redirect(resolveRedirectPath(profile.role, redirectTo));
 }
 
 export async function signup(
@@ -97,34 +112,41 @@ export async function signup(
     };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName },
-    },
-  });
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
 
-  if (error) {
-    return { error: error.message, message: null };
+    if (error) {
+      return { error: error.message, message: null };
+    }
+
+    if (!data.user) {
+      return { error: "Unable to create account. Try again.", message: null };
+    }
+
+    if (!data.session) {
+      return {
+        error: null,
+        message:
+          "Account created. Check your email to confirm your address, then sign in.",
+      };
+    }
+
+    const profile = await ensureProfileForUser(data.user);
+    const role = profile?.role ?? "client";
+    redirect(getRedirectPathForRole(role));
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return networkErrorState();
+    }
+    throw error;
   }
-
-  if (!data.user) {
-    return { error: "Unable to create account. Try again.", message: null };
-  }
-
-  if (!data.session) {
-    return {
-      error: null,
-      message:
-        "Account created. Check your email to confirm your address, then sign in.",
-    };
-  }
-
-  const profile = await ensureProfileForUser(data.user);
-  const role = profile?.role ?? "client";
-  redirect(getRedirectPathForRole(role));
 }
 
 export async function forgotPassword(
@@ -137,21 +159,28 @@ export async function forgotPassword(
     return { error: "Email is required.", message: null };
   }
 
-  const supabase = await createClient();
-  const origin = await getOrigin();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/login`,
-  });
+  try {
+    const supabase = await createClient();
+    const origin = await getOrigin();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/auth/callback?next=/login`,
+    });
 
-  if (error) {
-    return { error: error.message, message: null };
+    if (error) {
+      return { error: error.message, message: null };
+    }
+
+    return {
+      error: null,
+      message:
+        "If an account exists for that email, a password reset link has been sent.",
+    };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return networkErrorState();
+    }
+    throw error;
   }
-
-  return {
-    error: null,
-    message:
-      "If an account exists for that email, a password reset link has been sent.",
-  };
 }
 
 export async function repairAccount(
@@ -160,28 +189,35 @@ export async function repairAccount(
 ): Promise<AuthActionState> {
   const redirectTo = String(formData.get("redirectTo") ?? "").trim() || null;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (error || !user) {
-    return {
-      error: getAuthErrorMessage(AUTH_ERROR_CODES.auth),
-      message: null,
-    };
+    if (error || !user) {
+      return {
+        error: getAuthErrorMessage(AUTH_ERROR_CODES.auth),
+        message: null,
+      };
+    }
+
+    const profile = await ensureProfileForUser(user);
+    if (!profile) {
+      return {
+        error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
+        message: null,
+      };
+    }
+
+    redirect(resolveRedirectPath(profile.role, redirectTo));
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return networkErrorState();
+    }
+    throw error;
   }
-
-  const profile = await ensureProfileForUser(user);
-  if (!profile) {
-    return {
-      error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
-      message: null,
-    };
-  }
-
-  redirect(resolveRedirectPath(profile.role, redirectTo));
 }
 
 export async function logout() {

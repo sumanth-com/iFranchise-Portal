@@ -55,15 +55,38 @@ function getErrorName(error: unknown): string {
   return "";
 }
 
+function getErrorCode(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code?: string }).code ?? "");
+  }
+  return "";
+}
+
 /** Network, timeout, or infrastructure failures — show unavailable state. */
 export function isServiceUnavailableError(error: unknown): boolean {
+  if (
+    error &&
+    typeof error === "object" &&
+    "cause" in error &&
+    error.cause != null &&
+    isServiceUnavailableError(error.cause)
+  ) {
+    return true;
+  }
+
   const message = getErrorMessage(error).toLowerCase();
   const name = getErrorName(error);
+  const code = getErrorCode(error);
 
   if (
     name === "AbortError" ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "UND_ERR_SOCKET" ||
+    code === "ECONNRESET" ||
+    code === "ENOTFOUND" ||
     message.includes("timed out") ||
     message.includes("fetch failed") ||
+    message.includes("connect timeout") ||
     message.includes("network") ||
     message.includes("econnrefused") ||
     message.includes("enotfound")

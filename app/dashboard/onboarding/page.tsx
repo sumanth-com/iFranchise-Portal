@@ -1,45 +1,25 @@
-import { BrandOnboardingWizard } from "@/components/brand/BrandOnboardingWizard";
-import { getBrandAssets } from "@/lib/assets/queries";
-import { requireClient } from "@/lib/auth/session";
-import { getClientBrand } from "@/lib/brand/queries";
+import { redirect } from "next/navigation";
 
-type OnboardingPageProps = {
+import { requireClient } from "@/lib/auth/session";
+import { getClientBrands } from "@/lib/brand/queries";
+import { brandEditPath } from "@/types/brand";
+
+type OnboardingRedirectProps = {
   searchParams: Promise<{ step?: string }>;
 };
 
-function parseStep(value: string | undefined): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 1 || n > 9) return 1;
-  return Math.floor(n);
-}
-
-export default async function OnboardingPage({ searchParams }: OnboardingPageProps) {
+/** Legacy route — redirects to multi-brand edit flow. */
+export default async function OnboardingRedirectPage({
+  searchParams,
+}: OnboardingRedirectProps) {
   const params = await searchParams;
-  const step = parseStep(params.step);
-
+  const step = params.step ?? "1";
   const profile = await requireClient();
-  const { brand, error: loadError } = await getClientBrand(profile.id);
+  const { brands } = await getClientBrands(profile.id);
 
-  const assetsResult = brand
-    ? await getBrandAssets(brand.id)
-    : {
-        assets: {
-          logo: null,
-          gallery: [],
-          storePhotos: [],
-          productPhotos: [],
-          documents: [],
-        },
-        error: null,
-      };
+  if (brands.length === 0) {
+    redirect("/dashboard/brands/new");
+  }
 
-  return (
-    <BrandOnboardingWizard
-      brand={brand}
-      loadError={loadError}
-      assets={assetsResult.assets}
-      assetsError={assetsResult.error}
-      initialStep={step}
-    />
-  );
+  redirect(`${brandEditPath(brands[0].id, Number(step) || 1)}`);
 }

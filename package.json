@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:apply": "tsx scripts/apply-production-db.ts",
+    "db:prove": "tsx scripts/prove-rls-and-e2e.ts",
+    "db:verify": "tsx scripts/verify-production-db.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -29,6 +32,7 @@
     "@types/three": "^0.184.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "pg": "^8.21.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

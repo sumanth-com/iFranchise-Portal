@@ -131,12 +131,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // Fast path: user is already on login with a service error — don't block
-  // the page for another slow Supabase round-trip on every refresh.
-  if (isAuthPath(pathname) && authError === AUTH_ERROR_CODES.unavailable) {
-    return NextResponse.next({ request });
-  }
-
   const client = createMiddlewareClient(request);
   if (!client) {
     if (isProtectedPath(pathname)) {
@@ -150,6 +144,16 @@ export async function updateSession(request: NextRequest) {
 
   const { supabase, getResponse } = client;
   const hasAuthCookies = hasSupabaseAuthCookies(request);
+
+  // Fast path: login with a service error and no session cookies — nothing
+  // to recover; skip a slow Supabase round-trip on every refresh.
+  if (
+    isAuthPath(pathname) &&
+    authError === AUTH_ERROR_CODES.unavailable &&
+    !hasAuthCookies
+  ) {
+    return NextResponse.next({ request });
+  }
 
   // No session cookies — skip Supabase auth call entirely.
   if (!hasAuthCookies) {
@@ -259,9 +263,14 @@ export async function updateSession(request: NextRequest) {
     return redirectToApp(request, getRedirectPathForRole(role));
   }
 
-  // Auth pages: only redirect into the app when profile is valid and no blocking error.
+  // Auth pages: redirect into the app when profile is valid. Treat stale
+  // ?error=unavailable as non-blocking once session + profile resolve.
   if (isAuthPath(pathname)) {
-    if (isBlockingAuthError(authError)) {
+    const blockingError =
+      isBlockingAuthError(authError) &&
+      authError !== AUTH_ERROR_CODES.unavailable;
+
+    if (blockingError) {
       return getResponse();
     }
 

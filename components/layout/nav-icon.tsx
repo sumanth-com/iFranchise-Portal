@@ -1,23 +1,17 @@
 "use client";
 
 import {
-  BarChart3,
   Bell,
   Building2,
   ClipboardList,
-  Clock,
   Eye,
-  FileText,
-  Globe,
-  Images,
   LayoutDashboard,
   LifeBuoy,
-  MapPin,
-  Network,
-  Send,
+  MessageSquare,
+  Plus,
   Settings,
+  Store,
   Users,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,21 +20,15 @@ import type { NavIconName } from "@/lib/nav-config";
 const ICONS: Record<NavIconName, LucideIcon> = {
   layoutDashboard: LayoutDashboard,
   building2: Building2,
-  images: Images,
-  clipboardList: ClipboardList,
-  users: Users,
-  wallet: Wallet,
-  network: Network,
-  globe: Globe,
-  fileText: FileText,
-  send: Send,
+  plus: Plus,
+  eye: Eye,
+  messageSquare: MessageSquare,
   bell: Bell,
   settings: Settings,
-  barChart: BarChart3,
-  eye: Eye,
-  mapPin: MapPin,
-  clock: Clock,
   lifeBuoy: LifeBuoy,
+  store: Store,
+  clipboardList: ClipboardList,
+  users: Users,
 };
 
 type NavIconProps = {

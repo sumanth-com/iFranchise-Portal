@@ -1,4 +1,5 @@
-import type { FranchiseModel } from "@/types/brand";
+import { DRAFT_PLACEHOLDER_BUSINESS_NAME } from "@/lib/brand/constants";
+import type { Brand, FranchiseModel } from "@/types/brand";
 
 export type BrandFormValues = {
   businessName: string;
@@ -81,15 +82,59 @@ export function parseBrandFormData(formData: FormData): BrandFormValues {
   };
 }
 
+/** Preserve existing DB values when a wizard step omits fields from FormData. */
+export function mergeBrandFormWithExisting(
+  parsed: BrandFormValues,
+  existing: Brand,
+  formData: FormData,
+): BrandFormValues {
+  const has = (key: string) => formData.has(key);
+  const hasModels = formData.getAll("franchiseModels").length > 0;
+
+  return {
+    businessName: has("businessName") ? parsed.businessName : existing.business_name,
+    tagline: has("tagline") ? parsed.tagline : existing.tagline,
+    description: has("description") ? parsed.description : existing.description,
+    industry: has("industry") ? parsed.industry : existing.industry,
+    category: has("category") ? parsed.category : existing.category,
+    websiteUrl: has("websiteUrl") ? parsed.websiteUrl : existing.website_url,
+    contactEmail: has("contactEmail") ? parsed.contactEmail : existing.contact_email,
+    contactPhone: has("contactPhone") ? parsed.contactPhone : existing.contact_phone,
+    investmentMin: has("investmentMin") ? parsed.investmentMin : existing.investment_min,
+    investmentMax: has("investmentMax") ? parsed.investmentMax : existing.investment_max,
+    franchiseFee: has("franchiseFee") ? parsed.franchiseFee : existing.franchise_fee,
+    spaceRequiredSqft: has("spaceRequiredSqft")
+      ? parsed.spaceRequiredSqft
+      : existing.space_required_sqft,
+    roiPercent: has("roiPercent") ? parsed.roiPercent : existing.roi_percent,
+    paybackPeriodMonths: has("paybackPeriodMonths")
+      ? parsed.paybackPeriodMonths
+      : existing.payback_period_months,
+    franchiseModels: hasModels ? parsed.franchiseModels : (existing.franchise_models ?? []),
+    currentOutlets: has("currentOutlets") ? parsed.currentOutlets : existing.current_outlets,
+    existingCities: has("existingCities") ? parsed.existingCities : (existing.existing_cities ?? []),
+    targetCities: has("targetCities") ? parsed.targetCities : (existing.target_cities ?? []),
+    expansionTier1: has("expansionTier1") ? parsed.expansionTier1 : (existing.expansion_tier_1 ?? []),
+    expansionTier2: has("expansionTier2") ? parsed.expansionTier2 : (existing.expansion_tier_2 ?? []),
+    expansionMetro: has("expansionMetro") ? parsed.expansionMetro : (existing.expansion_metro ?? []),
+    agreementTermYears: has("agreementTermYears")
+      ? parsed.agreementTermYears
+      : existing.agreement_term_years,
+    lockInPeriodMonths: has("lockInPeriodMonths")
+      ? parsed.lockInPeriodMonths
+      : existing.lock_in_period_months,
+  };
+}
+
 export function validateBrandValues(
   values: BrandFormValues,
-  options: { requireAllForSubmit: boolean },
+  options: { requireAllForSubmit: boolean; isDraft?: boolean },
 ): string | null {
-  if (!values.businessName) {
+  if (!options.isDraft && !values.businessName) {
     return "Brand name is required.";
   }
 
-  if (values.businessName.length > 200) {
+  if (values.businessName && values.businessName.length > 200) {
     return "Brand name must be 200 characters or fewer.";
   }
 
@@ -125,9 +170,13 @@ export function validateBrandValues(
   return null;
 }
 
-export function toBrandRow(values: BrandFormValues) {
+export function toBrandRow(values: BrandFormValues, options?: { isDraft?: boolean }) {
+  const businessName =
+    values.businessName.trim() ||
+    (options?.isDraft ? DRAFT_PLACEHOLDER_BUSINESS_NAME : "");
+
   return {
-    business_name: values.businessName,
+    business_name: businessName,
     tagline: values.tagline,
     description: values.description,
     industry: values.industry,

@@ -2,13 +2,14 @@ import { Agent, type Dispatcher } from "undici";
 
 const CONNECT_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+const BODY_TIMEOUT_MS = 120_000;
 const MAX_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1_500;
 
 /** Extended connect timeout for slow networks — Node.js server only. */
 const supabaseDispatcher: Dispatcher = new Agent({
   connect: { timeout: CONNECT_TIMEOUT_MS },
-  bodyTimeout: REQUEST_TIMEOUT_MS,
+  bodyTimeout: BODY_TIMEOUT_MS,
   headersTimeout: REQUEST_TIMEOUT_MS,
 });
 

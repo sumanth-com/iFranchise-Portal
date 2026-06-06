@@ -2,60 +2,84 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { PanelLeft, PanelLeftClose } from "lucide-react";
 
-import { SectionStatusIcon } from "@/components/dashboard/client/section-status-icon";
 import { NavIcon } from "@/components/layout/nav-icon";
 import { Logo } from "@/components/ui/logo";
-import type { SectionProgress } from "@/lib/dashboard/section-completion";
-import { progressByKey } from "@/lib/dashboard/section-completion";
-import type { ClientNavGroup } from "@/lib/nav-config";
+import { isNavItemActive } from "@/lib/nav/is-nav-active";
+import type { ClientNavGroup, NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
 
 type ClientSidebarProps = {
   groups: ClientNavGroup[];
-  sections: SectionProgress[];
   collapsed: boolean;
   onToggle: () => void;
 };
 
-function isNavItemActive(
-  pathname: string,
-  searchParams: URLSearchParams,
-  href: string,
-): boolean {
-  const [path, query] = href.split("?");
-  if (pathname !== path && !pathname.startsWith(`${path}/`)) {
-    return false;
-  }
-  if (!query) {
-    return pathname === path;
-  }
-  const expected = new URLSearchParams(query);
-  return expected.get("step") === (searchParams.get("step") ?? "1");
+function NavLink({
+  item,
+  pathname,
+  collapsed,
+  nested = false,
+}: {
+  item: NavItem;
+  pathname: string;
+  collapsed: boolean;
+  nested?: boolean;
+}) {
+  const active = isNavItemActive(pathname, item.href);
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+        nested && !collapsed && "ml-3 py-2",
+        active
+          ? "text-[#6D28D9]"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+        collapsed && "justify-center px-2",
+      )}
+    >
+      {active ? (
+        <motion.span
+          layoutId="client-nav-active"
+          className="absolute inset-0 rounded-xl bg-[#F5F3FF] ring-1 ring-[#DDD6FE]"
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        />
+      ) : null}
+      <NavIcon
+        name={item.icon}
+        className={cn(
+          "relative z-10 h-4 w-4 shrink-0",
+          active ? "text-[#6D28D9]" : "text-slate-500",
+        )}
+      />
+      {!collapsed ? (
+        <span className="relative z-10 flex-1 truncate">{item.label}</span>
+      ) : null}
+    </Link>
+  );
 }
 
 export function ClientSidebar({
   groups,
-  sections,
   collapsed,
   onToggle,
 }: ClientSidebarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const progress = progressByKey(sections);
 
   return (
     <aside
       className={cn(
-        "hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-neutral-300 bg-white text-black transition-[width] duration-300 lg:sticky lg:top-0 lg:flex",
+        "hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-slate-200/80 bg-white transition-[width] duration-300 lg:sticky lg:top-0 lg:flex",
         collapsed ? "w-[var(--sidebar-collapsed)]" : "w-[var(--sidebar-width)]",
       )}
     >
       <div
         className={cn(
-          "flex h-[var(--topbar-height)] shrink-0 items-center border-b border-neutral-300 px-4",
+          "flex h-[var(--topbar-height)] shrink-0 items-center border-b border-slate-200/80 px-4",
           collapsed ? "justify-center" : "justify-between",
         )}
       >
@@ -67,7 +91,7 @@ export function ClientSidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="hidden rounded-lg p-2 text-black hover:bg-neutral-100 lg:block"
+          className="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-50 lg:block"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
@@ -85,53 +109,20 @@ export function ClientSidebar({
             className="mb-2"
           >
             {!collapsed && group.label ? (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-black">
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 {group.label}
               </p>
             ) : null}
-            {group.items.map((item) => {
-              const active = isNavItemActive(pathname, searchParams, item.href);
-              const sectionState = item.completionKey
-                ? progress[item.completionKey]?.state ?? "not_started"
-                : null;
-
-              return (
-                <Link
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavLink
                   key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-black transition-colors",
-                    active ? "text-black" : "hover:bg-white",
-                    collapsed && "justify-center px-2",
-                  )}
-                >
-                  {active ? (
-                    <motion.span
-                      layoutId="client-nav-active"
-                      className="absolute inset-0 rounded-xl border border-black bg-white"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  ) : null}
-                  <NavIcon
-                    name={item.icon}
-                    className="relative z-10 h-4 w-4 shrink-0 text-black"
-                  />
-                  {!collapsed ? (
-                    <>
-                      <span className="relative z-10 flex-1 truncate text-black">
-                        {item.label}
-                      </span>
-                      {sectionState ? (
-                        <SectionStatusIcon
-                          state={sectionState}
-                          className="relative z-10 shrink-0"
-                        />
-                      ) : null}
-                    </>
-                  ) : null}
-                </Link>
-              );
-            })}
+                  item={item}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                />
+              ))}
+            </div>
           </div>
         ))}
       </nav>

@@ -2,22 +2,27 @@ import type { ReactNode } from "react";
 
 import { ClientShell } from "@/components/dashboard/client/client-shell";
 import { getDashboardContext } from "@/lib/dashboard/context";
-import { getGreeting } from "@/lib/utils";
+import { buildPortalNotifications } from "@/lib/notifications/build-portal-notifications";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const { profile, sections } = await getDashboardContext();
+  const { profile, brands } = await getDashboardContext();
+  const firstName = profile.full_name?.trim().split(/\s+/)[0];
+  const notifications = buildPortalNotifications(brands);
 
   return (
     <ClientShell
       title="Brand Portal"
-      subtitle={getGreeting(profile.full_name)}
+      subtitle={
+        firstName ? `Welcome back, ${firstName}` : "Manage your franchise listings"
+      }
+      userId={profile.id}
       email={profile.email}
       name={profile.full_name}
-      sections={sections}
+      notifications={notifications}
     >
       {children}
     </ClientShell>

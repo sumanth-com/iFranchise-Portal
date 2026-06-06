@@ -64,6 +64,7 @@ export type Brand = {
 export type BrandActionState = {
   error: string | null;
   message: string | null;
+  brandId?: string | null;
 };
 
 export const initialBrandActionState: BrandActionState = {
@@ -72,17 +73,40 @@ export const initialBrandActionState: BrandActionState = {
 };
 
 export function isBrandEditable(status: BrandStatus): boolean {
-  return status === "draft" || status === "changes_requested";
+  return (
+    status === "draft" ||
+    status === "rejected" ||
+    status === "submitted" ||
+    status === "changes_requested"
+  );
 }
 
-export const ONBOARDING_STEPS = [
-  { id: 1, slug: "brand", title: "Brand Information", path: "/dashboard/onboarding?step=1" },
-  { id: 2, slug: "assets", title: "Brand Assets", path: "/dashboard/onboarding?step=2" },
-  { id: 3, slug: "investment", title: "Investment", path: "/dashboard/onboarding?step=3" },
-  { id: 4, slug: "franchise", title: "Franchise Model", path: "/dashboard/onboarding?step=4" },
-  { id: 5, slug: "network", title: "Network", path: "/dashboard/onboarding?step=5" },
-  { id: 6, slug: "expansion", title: "Expansion", path: "/dashboard/onboarding?step=6" },
-  { id: 7, slug: "agreement", title: "Agreement", path: "/dashboard/onboarding?step=7" },
-  { id: 8, slug: "documents", title: "Documents", path: "/dashboard/onboarding?step=8" },
-  { id: 9, slug: "review", title: "Review & Submit", path: "/dashboard/onboarding?step=9" },
+export function isBrandLocked(status: BrandStatus): boolean {
+  return status === "approved";
+}
+
+export function brandEditPath(brandId: string, step = 1): string {
+  return `/dashboard/brands/${brandId}/edit?step=${step}`;
+}
+
+export function brandNewPath(brandId?: string | null, step = 1): string {
+  const params = new URLSearchParams({ step: String(step) });
+  if (brandId) {
+    params.set("brandId", brandId);
+  }
+  return `/dashboard/brands/new?${params.toString()}`;
+}
+
+export const BRAND_CREATION_STEPS = [
+  { id: 1, slug: "basic", title: "Basic Information" },
+  { id: 2, slug: "assets", title: "Brand Assets" },
+  { id: 3, slug: "investment", title: "Investment Details" },
+  { id: 4, slug: "franchise", title: "Franchise Model" },
+  { id: 5, slug: "locations", title: "Locations" },
+  { id: 6, slug: "expansion", title: "Expansion Plan" },
+  { id: 7, slug: "documents", title: "Documents" },
+  { id: 8, slug: "review", title: "Review & Submit" },
 ] as const;
+
+/** @deprecated Use BRAND_CREATION_STEPS — kept for legacy references */
+export const ONBOARDING_STEPS = BRAND_CREATION_STEPS;

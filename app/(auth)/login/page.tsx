@@ -72,7 +72,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       pageError = getAuthErrorMessage(AUTH_ERROR_CODES.profile);
     }
 
-    if (profile && !isBlockingAuthError(authErrorCode)) {
+    // Stale ?error=unavailable from a transient middleware timeout — if the
+    // session and profile load successfully now, send the user to the app.
+    const staleUnavailable =
+      authErrorCode === AUTH_ERROR_CODES.unavailable && profile;
+
+    if (
+      profile &&
+      (!authErrorCode ||
+        staleUnavailable ||
+        !isBlockingAuthError(authErrorCode))
+    ) {
       const destination = isSafeRedirectPath(redirectTo)
         ? redirectTo
         : getRedirectPathForRole(profile.role);

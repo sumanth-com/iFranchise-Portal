@@ -1,0 +1,51 @@
+---
+description: Authentication stability is mandatory — UI work must never break auth, routing, or sessions
+alwaysApply: true
+---
+
+# Authentication Stability (Critical)
+
+**Authentication stability outranks design changes.** If a UI feature conflicts with auth, preserve auth.
+
+## Before ANY UI / styling / animation / component / route / dashboard work
+
+1. Audit the existing auth architecture (do not change it unless explicitly requested).
+2. Keep three layers isolated:
+   - **Auth layer** — session, middleware, Supabase clients, callbacks, role checks
+   - **Business logic** — server actions, data fetching, profile/brand queries
+   - **Presentation** — components, layouts, styling, animations only
+
+## Do NOT touch during UI work (unless user explicitly asks)
+
+- `middleware.ts`
+- `lib/supabase/middleware.ts`
+- `lib/auth/actions.ts`, `lib/auth/session.ts`, `lib/auth/resolve-auth.ts`
+- `lib/auth/fetch-profile.ts`, `lib/auth/ensure-profile.ts`, `lib/auth/cookies.ts`
+- `lib/supabase/server.ts`, `lib/supabase/client.ts`, `lib/supabase/env.ts`
+- `app/auth/callback/route.ts`
+- Role checking in `lib/auth/paths.ts`, `lib/auth/profile.ts`
+
+UI components may **consume** auth via existing APIs (`getUser`, `getProfile`, `requireClient`, etc.) — never reimplement auth inside UI files.
+
+## Pre-change checklist (STOP if any fail)
+
+- Login / logout / signup
+- Admin login and Brand Owner login
+- Dashboard and admin dashboard load
+- Middleware passes; session + profile load
+- Supabase connectivity; env vars present
+- No redirect loops, hydration errors, infinite renders, or repeated profile queries
+
+## Errors that must never appear
+
+`fetch failed`, connection/unavailable auth messages, profile load failures, infinite loading, hydration mismatch, redirect/middleware loops, blank dashboard, session missing.
+
+## Defensive handling
+
+- Supabase failures → graceful fallback; never crash or block login indefinitely
+- No infinite `useEffect` loops, repeated session/profile calls, or middleware loops
+- Use existing `fetchWithTimeout`, `resolveUserFromGetUser`, and error humanization — do not bypass
+
+## After every UI update
+
+Run auth health check and report: login, signup, logout, admin login, brand owner login, session persistence, dashboard access, role routing, protected routes, Supabase connectivity.

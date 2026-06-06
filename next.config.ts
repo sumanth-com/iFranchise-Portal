@@ -15,6 +15,14 @@ function getSupabaseHostname(): string | undefined {
 const supabaseHostname = getSupabaseHostname();
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Proxy (middleware) buffers request bodies before server actions; default is 10MB.
+    // Must be >= serverActions.bodySizeLimit or large PDF uploads are truncated.
+    proxyClientMaxBodySize: "25mb",
+    serverActions: {
+      bodySizeLimit: "25mb",
+    },
+  },
   images: supabaseHostname
     ? {
         remotePatterns: [

@@ -2,10 +2,8 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { deleteBrandAssetForm } from "@/lib/assets/actions";
+import { DeleteAssetButton } from "@/components/assets/DeleteAssetButton";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { BrandAssetWithUrl } from "@/types/assets";
@@ -75,18 +73,7 @@ export function ImagePreviewGrid({
               {(item.file_size / 1024).toFixed(0)} KB
             </p>
             {editable ? (
-              <form action={deleteBrandAssetForm}>
-                <input type="hidden" name="assetId" value={item.id} />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-full gap-1 text-xs text-slate-600"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Remove
-                </Button>
-              </form>
+              <DeleteAssetButton assetId={item.id} label="Remove" className="h-8 w-full text-xs" />
             ) : null}
           </div>
         </motion.li>

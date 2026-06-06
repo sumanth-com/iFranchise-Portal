@@ -1,10 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { deleteBrandAssetForm } from "@/lib/assets/actions";
+import { DeleteAssetButton } from "@/components/assets/DeleteAssetButton";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 import type { BrandAssetWithUrl } from "@/types/assets";
 
@@ -61,15 +60,7 @@ export function DocumentList({
               View
             </a>
           ) : null}
-          {editable ? (
-            <form action={deleteBrandAssetForm}>
-              <input type="hidden" name="assetId" value={item.id} />
-              <Button type="submit" variant="ghost" size="sm" className="h-8 gap-1 text-xs">
-                <Trash2 className="h-3.5 w-3.5" />
-                Remove
-              </Button>
-            </form>
-          ) : null}
+          {editable ? <DeleteAssetButton assetId={item.id} label="Remove" /> : null}
         </motion.li>
       ))}
     </motion.ul>

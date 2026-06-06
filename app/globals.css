@@ -52,10 +52,9 @@
   --dash-muted: #000000;
 }
 
-/* Brand Owner dashboard — force white bg + black text (no purple/dark theme) */
+/* Brand Owner dashboard — white page background */
 [data-dashboard="client"] {
   background-color: #ffffff;
-  color: #000000;
 }
 
 [data-dashboard="client"] .dash-card {
@@ -64,7 +63,7 @@
   border-color: #e0e0e0;
 }
 
-[data-dashboard="client"] :where(
+[data-dashboard="client"] .dash-card :where(
   h1,
   h2,
   h3,
@@ -74,12 +73,57 @@
   label,
   li,
   a,
-  button,
-  input,
-  textarea,
-  select
+  button
 ) {
   color: #000000;
+}
+
+/* Purple hero — always white text & icons on gradient */
+[data-dashboard="client"] .dash-hero {
+  color: #ffffff !important;
+}
+
+[data-dashboard="client"] .dash-hero :where(h1, h2, h3, h4, p, span, label, li, a, button, svg) {
+  color: #ffffff !important;
+}
+
+[data-dashboard="client"] .dash-hero .dash-hero-eyebrow {
+  color: rgb(255 255 255 / 0.85) !important;
+}
+
+[data-dashboard="client"] .dash-hero .dash-hero-subtitle {
+  color: rgb(255 255 255 / 0.92) !important;
+}
+
+[data-dashboard="client"] .dash-hero .dash-hero-btn-primary,
+[data-dashboard="client"] .dash-hero .dash-hero-btn-primary :where(span, svg) {
+  color: #6d28d9 !important;
+  stroke: #6d28d9 !important;
+}
+
+[data-dashboard="client"] .dash-hero .dash-hero-btn-secondary,
+[data-dashboard="client"] .dash-hero .dash-hero-btn-secondary :where(span, svg) {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Purple / colored surfaces — white text & icons (stat badges, avatars, CTAs) */
+[data-dashboard="client"] .dash-on-color {
+  color: #ffffff !important;
+}
+
+[data-dashboard="client"] .dash-on-color :where(svg, path) {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+[data-dashboard="client"] .dash-cta-purple {
+  color: #ffffff !important;
+}
+
+[data-dashboard="client"] .dash-cta-purple :where(svg, path) {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 [data-dashboard="client"] :where(a, button)[class*="bg-black"] {
@@ -245,3 +289,36 @@ body {
 .earth-avatar-glow {
   animation: earth-avatar-glow 2.8s ease-in-out infinite;
 }
+
+/* Dark mode — Brand Owner dashboard (Settings → Appearance) */
+html.dark [data-dashboard="client"] {
+  background-color: #0f172a;
+}
+
+html.dark [data-dashboard="client"] .dash-card {
+  background-color: #1e293b;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+html.dark [data-dashboard="client"] .dash-card :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  label,
+  li,
+  a,
+  button
+) {
+  color: #f1f5f9;
+}
+
+html.dark [data-dashboard="client"] .dash-hero,
+html.dark [data-dashboard="client"] .dash-on-color,
+html.dark [data-dashboard="client"] .dash-cta-purple {
+  color: #ffffff !important;
+}
+

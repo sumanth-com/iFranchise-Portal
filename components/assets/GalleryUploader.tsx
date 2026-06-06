@@ -1,14 +1,15 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { DocumentList } from "@/components/assets/DocumentList";
+import { FileDropzone } from "@/components/assets/FileDropzone";
 import { ImagePreviewGrid } from "@/components/assets/ImagePreviewGrid";
+import { UploadProgress } from "@/components/assets/UploadProgress";
 import { AuthAlert } from "@/components/auth/auth-alert";
-import { Button } from "@/components/ui/button";
-import { Dropzone } from "@/components/ui/dropzone";
-import { uploadGalleryImages } from "@/lib/assets/actions";
+import { uploadGalleryImagesLegacy } from "@/lib/assets/actions";
+import { validateDocumentFile, validateImageFile } from "@/lib/assets/validation";
 import type { AssetType, BrandAssetWithUrl } from "@/types/assets";
 import { initialAssetActionState } from "@/types/assets";
 
@@ -32,10 +33,17 @@ export function GalleryUploader({
   label,
   accept = DEFAULT_IMAGE_ACCEPT,
 }: GalleryUploaderProps) {
+  const router = useRouter();
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [, startUpload] = useTransition();
   const [state, formAction, isPending] = useActionState(
-    uploadGalleryImages,
+    uploadGalleryImagesLegacy,
     initialAssetActionState,
   );
+
+  useEffect(() => {
+    if (state.message) router.refresh();
+  }, [state.message, router]);
 
   const isDocument = assetType === "document";
   const heading = label ?? (isDocument ? "Documents" : "Gallery images");
@@ -43,22 +51,32 @@ export function GalleryUploader({
     ? "Drop PDF documents here"
     : "Drop gallery images here";
   const uploadHint = isDocument
-    ? "Select PDF files · Max 5MB each"
+    ? "PDF only · Max 20MB"
     : "Select multiple files · JPG, PNG, WEBP · Max 5MB each";
-  const submitLabel = isDocument
-    ? isPending
-      ? "Uploading..."
-      : "Upload documents"
-    : isPending
-      ? "Uploading..."
-      : "Upload images";
+
+  const handleFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    setLocalError(null);
+    for (const file of files) {
+      const err = isDocument ? validateDocumentFile(file) : validateImageFile(file);
+      if (err) {
+        setLocalError(err);
+        return;
+      }
+    }
+    const fd = new FormData();
+    fd.set("brandId", brandId);
+    fd.set("assetType", assetType);
+    files.forEach((f) => fd.append("files", f));
+    startUpload(() => formAction(fd));
+  };
 
   return (
     <section className="space-y-4">
       <h3 className="text-sm font-semibold text-foreground">{heading}</h3>
 
       <div aria-live="polite">
-        <AuthAlert error={state.error} message={state.message} />
+        <AuthAlert error={localError ?? state.error} message={state.message} />
       </div>
 
       {isDocument ? (
@@ -68,31 +86,20 @@ export function GalleryUploader({
       )}
 
       {editable ? (
-        <form action={formAction} className="space-y-4">
-          <input type="hidden" name="brandId" value={brandId} />
-          <input type="hidden" name="assetType" value={assetType} />
-          <Dropzone
-            name="files"
-            multiple
+        <div className="space-y-4">
+          <FileDropzone
             accept={accept}
+            multiple={!isDocument}
             disabled={isPending}
             label={uploadLabel}
             hint={uploadHint}
+            onFilesSelected={handleFiles}
           />
-          {isPending ? (
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-primary-600 to-accent-500"
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 1.2, repeat: Infinity }}
-              />
-            </div>
-          ) : null}
-          <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
-            {submitLabel}
-          </Button>
-        </form>
+          <UploadProgress
+            active={isPending}
+            label={isDocument ? "Uploading document…" : "Uploading images…"}
+          />
+        </div>
       ) : null}
     </section>
   );

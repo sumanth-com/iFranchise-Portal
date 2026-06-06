@@ -1,80 +1,78 @@
-import { BookOpen, LifeBuoy, Mail, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { Mail, MessageCircle, BookOpen } from "lucide-react";
 
 import { GlassCard } from "@/components/dashboard/client/glass-card";
 
-const SUPPORT_OPTIONS = [
+const OPTIONS = [
   {
-    id: "chat",
     icon: MessageCircle,
-    title: "Chat Support",
-    description:
-      "Connect with our franchise onboarding team for real-time help with your listing.",
-    action: "Start chat",
-    href: "mailto:support@ifranchise.in?subject=Chat%20Support",
+    title: "Live Chat",
+    description: "Chat with our support team during business hours.",
+    href: "mailto:support@ifranchise.com?subject=Support%20Request",
+    cta: "Start chat",
   },
   {
-    id: "documentation",
     icon: BookOpen,
     title: "Documentation",
-    description:
-      "Step-by-step guides for brand profiles, asset uploads, investment details, and submission.",
-    action: "View docs",
-    href: "#documentation",
+    description: "Guides for creating listings, submitting brands, and managing approvals.",
+    href: "/dashboard/support#documentation",
+    cta: "Browse docs",
   },
   {
-    id: "contact",
     icon: Mail,
-    title: "Contact Team",
-    description:
-      "Email our team for account issues, review questions, or partnership inquiries.",
-    action: "Email us",
-    href: "mailto:support@ifranchise.in",
+    title: "Contact Support",
+    description: "Email us for account, billing, or listing questions.",
+    href: "mailto:support@ifranchise.com",
+    cta: "Send email",
   },
 ];
 
 export default function SupportPage() {
   return (
-    <div className="space-y-6 text-black">
+    <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-black sm:text-3xl">Support</h2>
-        <p className="mt-2 text-sm text-black">
-          Get help launching your franchise on iFranchise.
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
+          Help Center
+        </p>
+        <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+          Support
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          We&apos;re here to help you manage your franchise listings.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {SUPPORT_OPTIONS.map((option) => {
-          const Icon = option.icon;
+      <div className="grid gap-6 sm:grid-cols-3">
+        {OPTIONS.map((opt) => {
+          const Icon = opt.icon;
           return (
-            <GlassCard key={option.id} hover id={option.id} className="text-black">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-300 bg-neutral-100 text-black">
+            <GlassCard key={opt.title} padding="lg" hover>
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F5F3FF] text-[#6D28D9]">
                 <Icon className="h-5 w-5" />
               </span>
-              <h3 className="mt-4 text-lg font-semibold text-black">
-                {option.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-black">
-                {option.description}
-              </p>
-              <a
-                href={option.href}
-                className="mt-4 inline-flex text-sm font-semibold text-black underline"
+              <h2 className="mt-4 text-base font-semibold text-slate-900">
+                {opt.title}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">{opt.description}</p>
+              <Link
+                href={opt.href}
+                className="mt-4 inline-block text-sm font-semibold text-[#6D28D9] hover:underline"
               >
-                {option.action} →
-              </a>
+                {opt.cta} →
+              </Link>
             </GlassCard>
           );
         })}
       </div>
 
-      <GlassCard padding="lg" className="flex items-start gap-4 text-black">
-        <LifeBuoy className="h-6 w-6 shrink-0 text-black" />
-        <div>
-          <h3 className="font-semibold text-black">Priority support</h3>
-          <p className="mt-1 text-sm text-black">
-            Brands under review receive priority responses within 1 business day.
-          </p>
-        </div>
+      <GlassCard padding="lg" id="documentation">
+        <h2 className="text-lg font-semibold text-slate-900">Quick guides</h2>
+        <ul className="mt-4 space-y-3 text-sm text-slate-600">
+          <li>• Create multiple franchise listings from My Brands</li>
+          <li>• Submit drafts for admin review when your profile is complete</li>
+          <li>• Preview listings exactly as investors will see them</li>
+          <li>• Request updates on approved listings when you need changes</li>
+        </ul>
       </GlassCard>
     </div>
   );

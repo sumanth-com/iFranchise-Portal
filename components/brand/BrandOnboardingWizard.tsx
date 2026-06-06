@@ -1,12 +1,10 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
-import { GalleryUploader } from "@/components/assets/GalleryUploader";
-import { LogoUploader } from "@/components/assets/LogoUploader";
+import { BrandAssetsStep } from "@/components/assets/BrandAssetsStep";
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { BrandStatusBadge } from "@/components/brand/BrandStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -15,22 +13,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { Textarea } from "@/components/ui/textarea";
-import { saveBrandDraft, submitBrandForReview } from "@/lib/brand/actions";
-import { easeOut } from "@/lib/motion";
+import { saveBrandDraft, submitBrandForReview, requestBrandUpdate } from "@/lib/brand/actions";
+import { displayBusinessName } from "@/lib/brand/constants";
+import {
+  calculateWizardProgress,
+  countFranchiseModels,
+} from "@/lib/brand/wizard-progress";
+import {
+  hasValidationErrors,
+  readWizardFormSummary,
+  stepIndexForSubmitError,
+  validateSubmitReadiness,
+  validateWizardStep,
+  type WizardFieldErrors,
+  type WizardFormSummary,
+} from "@/lib/brand/wizard-validation";
 import { formatDateTime } from "@/lib/format-date";
 import type { Brand, FranchiseModel } from "@/types/brand";
 import {
+  BRAND_CREATION_STEPS,
+  brandNewPath,
   FRANCHISE_MODEL_OPTIONS,
-  ONBOARDING_STEPS,
-  initialBrandActionState,
   isBrandEditable,
+  isBrandLocked,
+  initialBrandActionState,
 } from "@/types/brand";
 import type { BrandAssetsBundle } from "@/types/assets";
 
-const STEPS: Step[] = ONBOARDING_STEPS.map((s) => ({
+const STEPS: Step[] = BRAND_CREATION_STEPS.map((s) => ({
   id: String(s.id),
   title: s.title,
-  description: `Step ${s.id}`,
+  description: `Step ${s.id} of ${BRAND_CREATION_STEPS.length}`,
 }));
 
 type BrandOnboardingWizardProps = {
@@ -39,7 +52,13 @@ type BrandOnboardingWizardProps = {
   assets: BrandAssetsBundle;
   assetsError?: string | null;
   initialStep?: number;
+  mode?: "create" | "edit";
+  brandId?: string | null;
+  /** Base path for step navigation when editing, e.g. /dashboard/brands/{id}/edit */
+  editBasePath?: string;
 };
+
+type SaveStatus = "idle" | "saving" | "draft-saved" | "saved";
 
 export function BrandOnboardingWizard({
   brand,
@@ -47,14 +66,38 @@ export function BrandOnboardingWizard({
   assets,
   assetsError,
   initialStep = 1,
+  mode = "edit",
+  brandId = null,
+  editBasePath = "/dashboard/onboarding",
 }: BrandOnboardingWizardProps) {
   const router = useRouter();
-  const editable = !loadError && (!brand || isBrandEditable(brand.status));
+  const isCreateMode = mode === "create";
+  const [localBrandId, setLocalBrandId] = useState<string | null>(
+    brand?.id ?? brandId,
+  );
+  const resolvedBrandId = localBrandId;
+  const locked = Boolean(brand && isBrandLocked(brand.status));
+  const editable =
+    !loadError &&
+    !locked &&
+    (isCreateMode || Boolean(brand && isBrandEditable(brand.status)));
   const [step, setStep] = useState(
     Math.min(Math.max(initialStep, 1), STEPS.length) - 1,
   );
   const [pendingContinue, setPendingContinue] = useState(false);
+  const [isSubmittingNow, setIsSubmittingNow] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [fieldErrors, setFieldErrors] = useState<WizardFieldErrors>({});
+  const [reviewSnapshot, setReviewSnapshot] = useState<WizardFormSummary | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(
+    brand?.updated_at && isCreateMode && !brandId ? null : brand?.updated_at ?? null,
+  );
+  const [progressPercent, setProgressPercent] = useState(0);
   const saveDraftRef = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const saveIntentRef = useRef<"draft" | "continue">("draft");
+  const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [draftState, saveDraftAction, isSavingDraft] = useActionState(
     saveBrandDraft,
@@ -65,130 +108,372 @@ export function BrandOnboardingWizard({
     initialBrandActionState,
   );
 
-  const alertError = loadError ?? draftState.error ?? submitState.error;
-  const alertMessage = draftState.message ?? submitState.message;
-  const isPending = isSavingDraft || isSubmitting;
+  const [updateState, updateAction, isRequestingUpdate] = useActionState(
+    requestBrandUpdate,
+    initialBrandActionState,
+  );
+  const alertError =
+    loadError ?? submitError ?? draftState.error ?? submitState.error ?? updateState.error;
+  const alertMessage =
+    draftState.message ?? submitState.message ?? updateState.message;
+  const isFooterBusy =
+    isSavingDraft || isSubmitting || isSubmittingNow || isRequestingUpdate;
   const isLastStep = step === STEPS.length - 1;
 
   useEffect(() => {
+    if (brand?.id && !localBrandId) {
+      setLocalBrandId(brand.id);
+    } else if (brandId && !localBrandId) {
+      setLocalBrandId(brandId);
+    }
+  }, [brand?.id, brandId, localBrandId]);
+
+  const refreshProgress = useCallback(() => {
+    if (!formRef.current) {
+      setProgressPercent(0);
+      return;
+    }
+    setProgressPercent(
+      calculateWizardProgress(formRef.current, {
+        hasLogo: Boolean(assets.logo),
+        hasGallery: assets.gallery.length > 0,
+        hasBrochure: assets.documents.length > 0,
+        franchiseModelCount: countFranchiseModels(formRef.current),
+      }),
+    );
+  }, [assets.logo, assets.gallery.length, assets.documents.length]);
+
+  const scheduleProgressRefresh = useCallback(() => {
+    if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+    progressTimerRef.current = setTimeout(() => refreshProgress(), 600);
+  }, [refreshProgress]);
+
+  useEffect(() => {
+    refreshProgress();
+  }, [step, assets.logo, assets.gallery.length, assets.documents.length, refreshProgress]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    form.addEventListener("input", scheduleProgressRefresh);
+    form.addEventListener("change", scheduleProgressRefresh);
+    return () => {
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+      form.removeEventListener("input", scheduleProgressRefresh);
+      form.removeEventListener("change", scheduleProgressRefresh);
+    };
+  }, [step, editable, scheduleProgressRefresh]);
+
+  const stepInitializedRef = useRef(false);
+  useEffect(() => {
+    if (stepInitializedRef.current) return;
+    stepInitializedRef.current = true;
     setStep(Math.min(Math.max(initialStep, 1), STEPS.length) - 1);
   }, [initialStep]);
 
+  const buildStepUrl = (nextStep: number, id?: string | null) => {
+    const stepNum = Math.min(Math.max(nextStep, 1), STEPS.length);
+    if (isCreateMode) {
+      return brandNewPath(id ?? resolvedBrandId, stepNum);
+    }
+    return `${editBasePath}?step=${stepNum}`;
+  };
+
+  const syncUrl = (nextStep: number, id?: string | null) => {
+    const url = buildStepUrl(nextStep, id ?? resolvedBrandId);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
   useEffect(() => {
+    if (!draftState.message || draftState.error) {
+      if (draftState.error) {
+        setSaveStatus("idle");
+        setPendingContinue(false);
+      }
+      return;
+    }
+
+    if (draftState.brandId) {
+      const createdNewBrand = !resolvedBrandId;
+      setLocalBrandId(draftState.brandId);
+      if (createdNewBrand) {
+        syncUrl(step + 1, draftState.brandId);
+      }
+    }
+
+    setLastSavedAt(new Date().toISOString());
+    setSaveStatus(saveIntentRef.current === "continue" ? "saved" : "draft-saved");
+
     if (pendingContinue && draftState.message && !draftState.error) {
       const next = Math.min(step + 1, STEPS.length - 1);
+      if (step === 1 && next !== 1) {
+        router.refresh();
+      }
       setStep(next);
-      router.replace(`/dashboard/onboarding?step=${next + 1}`);
+      syncUrl(next + 1, draftState.brandId ?? resolvedBrandId);
       setPendingContinue(false);
     }
-    if (pendingContinue && draftState.error) {
-      setPendingContinue(false);
+
+    const t = setTimeout(() => setSaveStatus("idle"), 3000);
+    return () => clearTimeout(t);
+  }, [draftState.message, draftState.error, draftState.brandId, pendingContinue, step, resolvedBrandId]);
+
+  useEffect(() => {
+    if (submitState.message && !submitState.error && resolvedBrandId) {
+      router.push(`/dashboard/brands/${resolvedBrandId}/submitted`);
     }
-  }, [draftState, pendingContinue, router, step]);
+  }, [submitState.message, submitState.error, resolvedBrandId, router]);
 
   const goToStep = (index: number) => {
     const clamped = Math.min(Math.max(index, 0), STEPS.length - 1);
+    const leavingAssetsStep = step === 1 && clamped !== 1;
     setStep(clamped);
-    router.replace(`/dashboard/onboarding?step=${clamped + 1}`);
+    syncUrl(clamped + 1, resolvedBrandId);
+    if (leavingAssetsStep) {
+      router.refresh();
+    }
+    if (clamped === 7 && formRef.current) {
+      setReviewSnapshot(readWizardFormSummary(formRef.current));
+    }
+  };
+
+  useEffect(() => {
+    if (step === 7 && formRef.current) {
+      setReviewSnapshot(readWizardFormSummary(formRef.current));
+    }
+  }, [step]);
+
+  const handleSubmitForReview = async () => {
+    if (!formRef.current || isSubmittingNow) return;
+
+    const validation = validateSubmitReadiness(formRef.current, {
+      hasLogo: Boolean(assets.logo),
+    });
+
+    if (!validation.ok) {
+      setSubmitError(validation.message);
+      setFieldErrors(validation.fieldErrors);
+      goToStep(validation.stepIndex);
+      return;
+    }
+
+    setSubmitError(null);
+    setFieldErrors({});
+    setIsSubmittingNow(true);
+    setSaveStatus("saving");
+
+    const fd = new FormData(formRef.current);
+
+    try {
+      const draft = await saveBrandDraft(initialBrandActionState, fd);
+      if (draft.error) {
+        setSubmitError(draft.error);
+        setSaveStatus("idle");
+        return;
+      }
+
+      if (draft.brandId) {
+        setLocalBrandId(draft.brandId);
+        if (!fd.has("brandId")) {
+          fd.set("brandId", draft.brandId);
+        }
+      }
+
+      const submit = await submitBrandForReview(initialBrandActionState, fd);
+      if (submit.error) {
+        setSubmitError(submit.error);
+        setSaveStatus("idle");
+        const targetStep = stepIndexForSubmitError(submit.error);
+        if (targetStep != null) goToStep(targetStep);
+        return;
+      }
+
+      setSaveStatus("saved");
+      setLastSavedAt(new Date().toISOString());
+      router.push(`/dashboard/brands/${draft.brandId ?? resolvedBrandId}/submitted`);
+    } finally {
+      setIsSubmittingNow(false);
+    }
+  };
+
+  const handleSaveDraft = () => {
+    saveIntentRef.current = "draft";
+    setSaveStatus("saving");
   };
 
   const handleContinue = () => {
-    if (step === 1 || step === 7) {
+    if ((step === 1 || step === 6) && !resolvedBrandId) {
+      setFieldErrors({
+        businessName: "Save Basic Information on step 1 before continuing.",
+      });
+      setStep(0);
+      return;
+    }
+
+    if (step === 1) {
+      if (formRef.current) {
+        const errors = validateWizardStep(step, formRef.current, {
+          hasLogo: Boolean(assets.logo),
+        });
+        setFieldErrors(errors);
+        if (hasValidationErrors(errors)) return;
+      }
       goToStep(step + 1);
       return;
     }
+    if (formRef.current) {
+      const errors = validateWizardStep(step, formRef.current);
+      setFieldErrors(errors);
+      if (hasValidationErrors(errors)) return;
+    }
     setPendingContinue(true);
+    saveIntentRef.current = "continue";
+    setSaveStatus("saving");
     saveDraftRef.current?.click();
   };
 
-  return (
-    <Card className="relative scroll-mt-24" padding="lg">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">
-            Brand onboarding
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {editable
-              ? "Nine steps to launch on iFranchise — progress saves as you go."
-              : "Your profile is locked while under review."}
-          </p>
-        </div>
-        {brand ? <BrandStatusBadge status={brand.status} /> : null}
-      </div>
+  const statusLabel =
+    saveStatus === "saving"
+      ? "Saving…"
+      : saveStatus === "draft-saved"
+        ? "Draft saved ✓"
+        : saveStatus === "saved"
+          ? "Saved ✓"
+          : null;
 
-      {brand?.admin_feedback && brand.status === "changes_requested" ? (
+  return (
+    <div className="relative w-full pb-28">
+      <Card
+        className="relative scroll-mt-24 border-slate-200/80 shadow-[0_4px_24px_rgba(15,23,42,0.06)]"
+        padding="none"
+      >
+        {/* Header */}
+        <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50/80 to-white px-5 py-5 sm:px-6 sm:py-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
+                Brand Creation Wizard
+              </p>
+              <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                {isCreateMode
+                  ? "Create franchise listing"
+                  : brand
+                    ? `Edit ${brand.business_name}`
+                    : "Edit brand listing"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Complete your franchise profile to publish on the marketplace.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {brand ? <BrandStatusBadge status={brand.status} /> : null}
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                {brand?.status === "draft" || isCreateMode ? "Draft" : brand?.status}
+              </span>
+              {statusLabel ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  {statusLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          {editable ? (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="font-semibold text-[#6D28D9]">
+                  {progressPercent}% complete
+                </span>
+                {lastSavedAt ? (
+                  <span>Last saved {formatDateTime(lastSavedAt)}</span>
+                ) : (
+                  <span>Not saved yet</span>
+                )}
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#6D28D9] to-[#4F46E5] transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {editable ? (
+          <div className="border-b border-slate-100 px-5 py-5 sm:px-6 sm:py-6">
+            <Stepper steps={STEPS} currentStep={step} compact />
+          </div>
+        ) : null}
+
+        <div className="px-5 py-6 sm:px-6 sm:py-7">
+      {brand && locked && brand.reviewed_at ? (
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <p className="font-semibold">Approved by iFranchise</p>
+          <p className="mt-1">
+            Last approved{" "}
+            {formatDateTime(brand.reviewed_at) ?? brand.reviewed_at}
+          </p>
+          <form action={updateAction} className="mt-4">
+            <input type="hidden" name="brandId" value={brand.id} />
+            <Button type="submit" disabled={isRequestingUpdate} size="sm">
+              {isRequestingUpdate ? "Requesting…" : "Request Update"}
+            </Button>
+          </form>
+        </div>
+      ) : null}
+
+      {brand?.admin_feedback &&
+      (brand.status === "changes_requested" || brand.status === "rejected") ? (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-semibold">Reviewer feedback</p>
           <p className="mt-1 whitespace-pre-wrap">{brand.admin_feedback}</p>
         </div>
       ) : null}
 
-      <div className="mt-6" aria-live="polite">
+      <div className="mt-0" aria-live="polite">
         <AuthAlert error={alertError} message={alertMessage} />
       </div>
 
-      {editable ? (
-        <div className="mt-8 overflow-x-auto">
-          <Stepper steps={STEPS} currentStep={step} />
-        </div>
-      ) : null}
-
-      {isPending ? (
-        <div className="pointer-events-none absolute inset-0 z-10 rounded-[var(--radius-card)] bg-white/70 backdrop-blur-[2px]" />
-      ) : null}
-
-      <form className="mt-8">
+      <form ref={formRef} className="mt-6">
+        {resolvedBrandId ? (
+          <input type="hidden" name="brandId" value={resolvedBrandId} />
+        ) : null}
         {/* Step 1: Brand Information */}
         <StepPanel active={step === 0}>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Brand name" name="businessName" defaultValue={brand?.business_name} required disabled={!editable || isPending} />
-            <Field label="Industry" name="industry" defaultValue={brand?.industry} disabled={!editable || isPending} placeholder="e.g. Food & Beverage" />
-            <Field label="Category" name="category" defaultValue={brand?.category} disabled={!editable || isPending} placeholder="e.g. Quick Service Restaurant" />
-            <Field label="Tagline" name="tagline" defaultValue={brand?.tagline} disabled={!editable || isPending} />
+            <Field label="Brand name" name="businessName" defaultValue={displayBusinessName(brand?.business_name)} required disabled={!editable} error={fieldErrors.businessName} />
+            <Field label="Industry" name="industry" defaultValue={brand?.industry} disabled={!editable} placeholder="e.g. Food & Beverage" error={fieldErrors.industry} />
+            <Field label="Category" name="category" defaultValue={brand?.category} disabled={!editable} placeholder="e.g. Quick Service Restaurant" required error={fieldErrors.category} />
+            <Field label="Tagline" name="tagline" defaultValue={brand?.tagline} disabled={!editable} />
           </div>
           <div className="mt-5 space-y-2">
             <Label htmlFor="description">Description</Label>
-            <Textarea id="description" name="description" rows={6} defaultValue={brand?.description ?? ""} disabled={!editable || isPending} placeholder="Tell your franchise story..." />
+            <Textarea id="description" name="description" rows={6} defaultValue={brand?.description ?? ""} disabled={!editable} placeholder="Tell your franchise story..." />
           </div>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <Field label="Contact email" name="contactEmail" type="email" defaultValue={brand?.contact_email} disabled={!editable || isPending} />
-            <Field label="Contact phone" name="contactPhone" type="tel" defaultValue={brand?.contact_phone} disabled={!editable || isPending} />
+            <Field label="Contact email" name="contactEmail" type="email" defaultValue={brand?.contact_email} disabled={!editable} error={fieldErrors.contactEmail} />
+            <Field label="Contact phone" name="contactPhone" type="tel" defaultValue={brand?.contact_phone} disabled={!editable} error={fieldErrors.contactPhone} />
           </div>
-        </StepPanel>
-
-        {/* Step 2: Assets */}
-        <StepPanel active={step === 1}>
-          {brand ? (
-            <div className="space-y-8">
-              {assetsError ? <p className="text-sm text-red-700">{assetsError}</p> : null}
-              <LogoUploader brandId={brand.id} logo={assets.logo} editable={editable} />
-              <GalleryUploader brandId={brand.id} gallery={assets.gallery} editable={editable} label="Gallery images" />
-              <GalleryUploader brandId={brand.id} gallery={assets.storePhotos} editable={editable} assetType="store_photo" label="Store photos" />
-              <GalleryUploader brandId={brand.id} gallery={assets.productPhotos} editable={editable} assetType="product_photo" label="Product photos" />
-            </div>
-          ) : (
-            <p className="rounded-2xl bg-primary-50 px-4 py-6 text-center text-sm text-primary-800">
-              Complete Step 1 and save, then return here to upload assets.
-            </p>
-          )}
         </StepPanel>
 
         {/* Step 3: Investment */}
         <StepPanel active={step === 2}>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Investment min (₹)" name="investmentMin" type="number" defaultValue={brand?.investment_min?.toString()} disabled={!editable || isPending} />
-            <Field label="Investment max (₹)" name="investmentMax" type="number" defaultValue={brand?.investment_max?.toString()} disabled={!editable || isPending} />
-            <Field label="Franchise fee (₹)" name="franchiseFee" type="number" defaultValue={brand?.franchise_fee?.toString()} disabled={!editable || isPending} />
-            <Field label="Space required (sq ft)" name="spaceRequiredSqft" type="number" defaultValue={brand?.space_required_sqft?.toString()} disabled={!editable || isPending} />
-            <Field label="ROI (%)" name="roiPercent" type="number" defaultValue={brand?.roi_percent?.toString()} disabled={!editable || isPending} />
-            <Field label="Payback period (months)" name="paybackPeriodMonths" type="number" defaultValue={brand?.payback_period_months?.toString()} disabled={!editable || isPending} />
+            <Field label="Investment min (₹)" name="investmentMin" type="number" defaultValue={brand?.investment_min?.toString()} disabled={!editable} required error={fieldErrors.investmentMin} />
+            <Field label="Investment max (₹)" name="investmentMax" type="number" defaultValue={brand?.investment_max?.toString()} disabled={!editable} />
+            <Field label="Franchise fee (₹)" name="franchiseFee" type="number" defaultValue={brand?.franchise_fee?.toString()} disabled={!editable} required error={fieldErrors.franchiseFee} />
+            <Field label="ROI (%)" name="roiPercent" type="number" defaultValue={brand?.roi_percent?.toString()} disabled={!editable} />
+            <Field label="Payback period (months)" name="paybackPeriodMonths" type="number" defaultValue={brand?.payback_period_months?.toString()} disabled={!editable} />
           </div>
         </StepPanel>
 
-        {/* Step 4: Franchise Model */}
+        {/* Step 4: Franchise Model (+ agreement terms) */}
         <StepPanel active={step === 3}>
           <p className="mb-4 text-sm text-slate-500">Select all models you offer.</p>
+          {fieldErrors.franchiseModels ? (
+            <p className="mb-3 text-sm font-medium text-red-600">{fieldErrors.franchiseModels}</p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {FRANCHISE_MODEL_OPTIONS.map((opt) => (
               <label key={opt.value} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-4 hover:bg-surface-muted">
@@ -197,7 +482,7 @@ export function BrandOnboardingWizard({
                   name="franchiseModels"
                   value={opt.value}
                   defaultChecked={brand?.franchise_models?.includes(opt.value as FranchiseModel)}
-                  disabled={!editable || isPending}
+                  disabled={!editable}
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600"
                 />
                 <span>
@@ -207,54 +492,68 @@ export function BrandOnboardingWizard({
               </label>
             ))}
           </div>
+          <div className="mt-6 grid gap-5 border-t border-slate-100 pt-6 sm:grid-cols-2">
+            <Field label="Agreement term (years)" name="agreementTermYears" type="number" defaultValue={brand?.agreement_term_years?.toString()} disabled={!editable} />
+            <Field label="Lock-in period (months)" name="lockInPeriodMonths" type="number" defaultValue={brand?.lock_in_period_months?.toString()} disabled={!editable} />
+            <Field label="Space required (sq ft)" name="spaceRequiredSqft" type="number" defaultValue={brand?.space_required_sqft?.toString()} disabled={!editable} />
+          </div>
         </StepPanel>
 
-        {/* Step 5: Network */}
+        {/* Step 5: Locations */}
         <StepPanel active={step === 4}>
           <div className="space-y-5">
-            <Field label="Current outlets" name="currentOutlets" type="number" defaultValue={brand?.current_outlets?.toString()} disabled={!editable || isPending} />
-            <CityField label="Existing cities" name="existingCities" defaultValue={brand?.existing_cities?.join(", ")} disabled={!editable || isPending} />
+            <Field label="Current outlets" name="currentOutlets" type="number" defaultValue={brand?.current_outlets?.toString()} disabled={!editable} />
+            <CityField label="Existing cities" name="existingCities" defaultValue={brand?.existing_cities?.join(", ")} disabled={!editable} />
           </div>
         </StepPanel>
 
         {/* Step 6: Expansion */}
         <StepPanel active={step === 5}>
           <div className="space-y-5">
-            <CityField label="Target cities" name="targetCities" defaultValue={brand?.target_cities?.join(", ")} disabled={!editable || isPending} />
-            <CityField label="Tier 1 cities" name="expansionTier1" defaultValue={brand?.expansion_tier_1?.join(", ")} disabled={!editable || isPending} />
-            <CityField label="Tier 2 cities" name="expansionTier2" defaultValue={brand?.expansion_tier_2?.join(", ")} disabled={!editable || isPending} />
-            <CityField label="Metro cities" name="expansionMetro" defaultValue={brand?.expansion_metro?.join(", ")} disabled={!editable || isPending} />
+            <CityField label="Target cities" name="targetCities" defaultValue={brand?.target_cities?.join(", ")} disabled={!editable} />
+            <CityField label="Tier 1 cities" name="expansionTier1" defaultValue={brand?.expansion_tier_1?.join(", ")} disabled={!editable} />
+            <CityField label="Tier 2 cities" name="expansionTier2" defaultValue={brand?.expansion_tier_2?.join(", ")} disabled={!editable} />
+            <CityField label="Metro cities" name="expansionMetro" defaultValue={brand?.expansion_metro?.join(", ")} disabled={!editable} />
           </div>
         </StepPanel>
 
-        {/* Step 7: Agreement */}
+        {/* Step 7: Documents — brochure uploaded on Brand Assets (step 2) */}
         <StepPanel active={step === 6}>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Agreement term (years)" name="agreementTermYears" type="number" defaultValue={brand?.agreement_term_years?.toString()} disabled={!editable || isPending} />
-            <Field label="Lock-in period (months)" name="lockInPeriodMonths" type="number" defaultValue={brand?.lock_in_period_months?.toString()} disabled={!editable || isPending} />
-          </div>
-        </StepPanel>
-
-        {/* Step 8: Documents */}
-        <StepPanel active={step === 7}>
-          {brand ? (
-            <GalleryUploader
-              brandId={brand.id}
-              gallery={assets.documents}
-              editable={editable}
-              assetType="document"
-              label="Franchise brochure & documents (PDF)"
-              accept="application/pdf"
-            />
+          {resolvedBrandId ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Upload your logo, gallery images, and franchise brochure on{" "}
+                <strong>Brand Assets</strong> (step 2). They are saved automatically
+                when uploaded.
+              </p>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <SummaryItem label="Logo" value={assets.logo ? "Uploaded" : "Missing — required"} />
+                <SummaryItem
+                  label="Gallery images"
+                  value={`${assets.gallery.length} image(s)`}
+                />
+                <SummaryItem
+                  label="Brochure PDF"
+                  value={
+                    assets.documents[0]
+                      ? assets.documents[0].file_name
+                      : "Not uploaded (optional)"
+                  }
+                />
+              </dl>
+              {fieldErrors.brochure ? (
+                <p className="text-sm font-medium text-red-600">{fieldErrors.brochure}</p>
+              ) : null}
+            </div>
           ) : (
             <p className="rounded-2xl bg-primary-50 px-4 py-6 text-center text-sm text-primary-800">
-              Save your brand profile first, then upload documents.
+              Complete Basic Information and save, then upload assets on step 2.
             </p>
           )}
         </StepPanel>
 
-        {/* Step 9: Review */}
-        <StepPanel active={step === 8}>
+        {/* Step 8: Review */}
+        <StepPanel active={step === 7}>
           <div className="space-y-6">
             <div className="rounded-2xl bg-primary-50 p-5 ring-1 ring-primary-100">
               <div className="flex items-center gap-2 text-primary-700">
@@ -266,14 +565,54 @@ export function BrandOnboardingWizard({
               </p>
             </div>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <SummaryItem label="Brand" value={brand?.business_name} />
-              <SummaryItem label="Industry" value={brand?.industry} />
-              <SummaryItem label="Category" value={brand?.category} />
-              <SummaryItem label="Investment min" value={brand?.investment_min != null ? `₹${brand.investment_min}` : null} />
-              <SummaryItem label="Franchise models" value={brand?.franchise_models?.join(", ")} />
+              <SummaryItem
+                label="Brand"
+                value={
+                  reviewSnapshot?.businessName ||
+                  displayBusinessName(brand?.business_name) ||
+                  brand?.business_name
+                }
+              />
+              <SummaryItem
+                label="Industry"
+                value={reviewSnapshot?.industry ?? brand?.industry}
+              />
+              <SummaryItem
+                label="Category"
+                value={reviewSnapshot?.category ?? brand?.category}
+                highlight={!reviewSnapshot?.category && !brand?.category}
+              />
+              <SummaryItem
+                label="Investment min"
+                value={
+                  reviewSnapshot?.investmentMin != null
+                    ? `₹${reviewSnapshot.investmentMin}`
+                    : brand?.investment_min != null
+                      ? `₹${brand.investment_min}`
+                      : null
+                }
+                highlight={reviewSnapshot?.investmentMin == null && brand?.investment_min == null}
+              />
+              <SummaryItem
+                label="Franchise models"
+                value={
+                  reviewSnapshot?.franchiseModels ||
+                  brand?.franchise_models?.join(", ")
+                }
+                highlight={
+                  !reviewSnapshot?.franchiseModels &&
+                  !(brand?.franchise_models?.length ?? 0)
+                }
+              />
               <SummaryItem label="Logo" value={assets.logo ? "Uploaded" : "Missing"} />
               <SummaryItem label="Documents" value={`${assets.documents.length} file(s)`} />
             </dl>
+            {!reviewSnapshot?.category && !brand?.category ? (
+              <p className="text-sm text-amber-800">
+                Category is missing — go to <strong>Basic Information</strong> (step 1) to
+                add it, then click <strong>Save Draft</strong> or submit again.
+              </p>
+            ) : null}
             {brand?.submitted_at ? (
               <p className="text-xs text-slate-500">
                 Last submitted {formatDateTime(brand.submitted_at)}
@@ -283,61 +622,107 @@ export function BrandOnboardingWizard({
         </StepPanel>
 
         {editable ? (
-          <div className="sticky bottom-24 z-10 mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-white/95 p-4 shadow-[var(--shadow-md)] backdrop-blur-md sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-            {step > 0 ? (
-              <Button type="button" variant="secondary" onClick={() => goToStep(step - 1)} disabled={isPending}>
-                Back
-              </Button>
-            ) : (
-              <div className="hidden flex-1 sm:block" />
-            )}
-
-            {!isLastStep ? (
-              <Button type="button" onClick={handleContinue} disabled={isPending || pendingContinue} className="flex-1 sm:ml-auto sm:flex-none">
-                {pendingContinue ? "Saving..." : "Save & continue"}
-              </Button>
-            ) : (
-              <>
-                <Button type="submit" variant="secondary" formAction={saveDraftAction} disabled={isPending}>
-                  {isSavingDraft ? "Saving..." : "Save draft"}
+          <div className="fixed bottom-20 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md lg:bottom-0 lg:left-[var(--sidebar-width,16rem)]">
+            <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+              {step > 0 ? (
+                <Button type="button" variant="secondary" onClick={() => goToStep(step - 1)} disabled={isFooterBusy}>
+                  Previous
                 </Button>
-                <Button type="submit" formAction={submitAction} disabled={isPending}>
-                  {isSubmitting ? "Submitting..." : "Submit for review"}
+              ) : (
+                <div className="hidden flex-1 sm:block" />
+              )}
+
+              <div className="flex flex-1 flex-col gap-2 sm:ml-auto sm:flex-row sm:justify-end">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  formAction={saveDraftAction}
+                  disabled={isFooterBusy}
+                  onClick={handleSaveDraft}
+                >
+                  {isSavingDraft && saveIntentRef.current === "draft"
+                    ? "Saving…"
+                    : "Save Draft"}
                 </Button>
-              </>
-            )}
 
-            <button ref={saveDraftRef} type="submit" formAction={saveDraftAction} className="sr-only" tabIndex={-1} aria-hidden>
-              Save
-            </button>
+                {!isLastStep ? (
+                  <Button
+                    type="button"
+                    onClick={handleContinue}
+                    disabled={isFooterBusy || pendingContinue}
+                  >
+                    {pendingContinue || (isSavingDraft && saveIntentRef.current === "continue")
+                      ? "Saving…"
+                      : "Save & Continue"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleSubmitForReview}
+                    disabled={isFooterBusy}
+                  >
+                    {isSubmittingNow || isSubmitting ? "Submitting…" : "Submit for Review"}
+                  </Button>
+                )}
 
-            {!isLastStep ? (
-              <Button type="submit" variant="ghost" formAction={saveDraftAction} disabled={isPending}>
-                {isSavingDraft ? "Saving..." : "Save draft"}
-              </Button>
-            ) : null}
+                {!isLastStep ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      if (formRef.current) {
+                        const errors = validateWizardStep(step, formRef.current, {
+                          hasLogo: Boolean(assets.logo),
+                        });
+                        setFieldErrors(errors);
+                        if (hasValidationErrors(errors)) return;
+                      }
+                      goToStep(step + 1);
+                    }}
+                    disabled={isFooterBusy}
+                  >
+                    Next Step
+                  </Button>
+                ) : null}
+              </div>
+
+              <button ref={saveDraftRef} type="submit" formAction={saveDraftAction} className="sr-only" tabIndex={-1} aria-hidden>
+                Save
+              </button>
+            </div>
           </div>
         ) : null}
       </form>
-    </Card>
+
+      {step === 1 ? (
+        <div className="mt-6">
+          {resolvedBrandId ? (
+            <BrandAssetsStep
+              brandId={resolvedBrandId}
+              assets={assets}
+              editable={editable}
+              assetsError={assetsError}
+              logoError={fieldErrors.logo}
+            />
+          ) : (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">
+              Save Basic Information on step 1 first, then return here to upload your
+              logo, gallery, and brochure.
+            </p>
+          )}
+        </div>
+      ) : null}
+        </div>
+      </Card>
+    </div>
   );
 }
 
 function StepPanel({ active, children }: { active: boolean; children: React.ReactNode }) {
   return (
-    <AnimatePresence mode="wait">
-      {active ? (
-        <motion.div
-          key="panel"
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -12 }}
-          transition={{ duration: 0.28, ease: easeOut }}
-        >
-          {children}
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+    <div className={active ? undefined : "hidden"} aria-hidden={!active}>
+      {children}
+    </div>
   );
 }
 
@@ -349,6 +734,7 @@ function Field({
   required,
   type = "text",
   placeholder,
+  error,
 }: {
   label: string;
   name: string;
@@ -357,11 +743,23 @@ function Field({
   required?: boolean;
   type?: string;
   placeholder?: string;
+  error?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type={type} defaultValue={defaultValue ?? ""} required={required} disabled={disabled} placeholder={placeholder} />
+      <Input
+        id={name}
+        name={name}
+        type={type}
+        defaultValue={defaultValue ?? ""}
+        required={required}
+        disabled={disabled}
+        placeholder={placeholder}
+        aria-invalid={Boolean(error)}
+        className={error ? "border-red-300 ring-1 ring-red-200 focus-visible:ring-red-300" : undefined}
+      />
+      {error ? <p className="text-xs font-medium text-red-600">{error}</p> : null}
     </div>
   );
 }
@@ -376,9 +774,24 @@ function CityField({ label, name, defaultValue, disabled }: { label: string; nam
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string | null | undefined }) {
+function SummaryItem({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string | null | undefined;
+  highlight?: boolean;
+}) {
+  const empty = !value?.trim();
   return (
-    <div className="rounded-xl bg-surface-muted px-3 py-2">
+    <div
+      className={`rounded-xl px-3 py-2 ${
+        highlight || empty
+          ? "bg-amber-50 ring-1 ring-amber-200"
+          : "bg-surface-muted"
+      }`}
+    >
       <dt className="text-xs font-medium text-slate-500">{label}</dt>
       <dd className="mt-0.5 font-medium text-foreground">{value?.trim() || "—"}</dd>
     </div>

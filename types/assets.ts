@@ -31,9 +31,16 @@ export type BrandAssetsBundle = {
 export type AssetActionState = {
   error: string | null;
   message: string | null;
+  /** Raw server error — logged to browser console for debugging */
+  debug?: string | null;
+  /** Single asset returned after logo/brochure upload for optimistic UI */
+  uploadedAsset?: BrandAssetWithUrl | null;
+  /** Multiple assets returned after gallery upload */
+  uploadedAssets?: BrandAssetWithUrl[];
 };
 
 export const initialAssetActionState: AssetActionState = {
   error: null,
   message: null,
+  debug: null,
 };

@@ -3,12 +3,12 @@ import { displayStatusLabel } from "@/lib/dashboard/listing-data";
 import type { BrandStatus } from "@/types/brand";
 
 const STYLES: Record<BrandStatus | "preview", string> = {
-  draft: "bg-neutral-100 text-black ring-neutral-300",
-  submitted: "bg-neutral-100 text-black ring-neutral-400",
-  changes_requested: "bg-neutral-200 text-black ring-neutral-500",
-  approved: "bg-neutral-100 text-black ring-black",
-  rejected: "bg-neutral-200 text-black ring-neutral-600",
-  preview: "bg-white text-black ring-black",
+  draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  submitted: "bg-amber-50 text-amber-800 ring-amber-200",
+  changes_requested: "bg-orange-50 text-orange-800 ring-orange-200",
+  approved: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  rejected: "bg-rose-50 text-rose-800 ring-rose-200",
+  preview: "bg-violet-50 text-violet-800 ring-violet-200",
 };
 
 type DashboardStatusBadgeProps = {

@@ -1,4 +1,7 @@
-import { MAX_ASSET_SIZE_BYTES } from "@/lib/assets/constants";
+import {
+  MAX_BROCHURE_SIZE_BYTES,
+  MAX_IMAGE_SIZE_BYTES,
+} from "@/lib/assets/constants";
 import type { AssetType } from "@/types/assets";
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
@@ -25,17 +28,17 @@ export function validateImageFile(file: File): string | null {
     return "Please select an image file.";
   }
 
-  if (file.size > MAX_ASSET_SIZE_BYTES) {
-    return "Image must be 5MB or smaller.";
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return "File exceeds maximum size.";
   }
 
   const extension = getFileExtension(file.name);
   if (!ALLOWED_IMAGE_EXTENSIONS.has(extension)) {
-    return "Only JPG, PNG, and WEBP images are allowed.";
+    return "Unsupported file type.";
   }
 
-  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
-    return "Only JPG, PNG, and WEBP images are allowed.";
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type) && file.type !== "") {
+    return "Unsupported file type.";
   }
 
   return null;
@@ -46,17 +49,17 @@ export function validateDocumentFile(file: File): string | null {
     return "Please select a PDF file.";
   }
 
-  if (file.size > MAX_ASSET_SIZE_BYTES) {
-    return "Document must be 5MB or smaller.";
+  if (file.size > MAX_BROCHURE_SIZE_BYTES) {
+    return "File exceeds maximum size.";
   }
 
   const extension = getFileExtension(file.name);
   if (!ALLOWED_DOCUMENT_EXTENSIONS.has(extension)) {
-    return "Only PDF documents are allowed.";
+    return "Unsupported file type.";
   }
 
   if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type) && file.type !== "") {
-    return "Only PDF documents are allowed.";
+    return "Unsupported file type.";
   }
 
   return null;

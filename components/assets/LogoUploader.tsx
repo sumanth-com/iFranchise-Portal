@@ -69,7 +69,11 @@ export function LogoUploader({ brandId, logo, editable }: LogoUploaderProps) {
             hint="JPG, PNG, or WEBP · Max 5MB"
             onFilesSelected={handleFiles}
           />
-          <UploadProgress active={isPending} label="Uploading logo…" />
+          <UploadProgress
+            active={isPending}
+            error={isPending ? null : state.error}
+            label="Uploading logo…"
+          />
         </div>
       ) : null}
     </section>

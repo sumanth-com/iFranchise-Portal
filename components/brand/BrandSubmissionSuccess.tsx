@@ -37,7 +37,7 @@ const item = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 420, damping: 32 },
+    transition: { type: "spring" as const, stiffness: 420, damping: 32 },
   },
 };
 

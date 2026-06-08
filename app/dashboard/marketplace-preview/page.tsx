@@ -5,9 +5,9 @@ import { ArrowRight } from "lucide-react";
 import { getDashboardContext } from "@/lib/dashboard/context";
 
 export default async function MarketplacePreviewPage() {
-  const { brands } = await getDashboardContext();
+  const { brands, brandsError } = await getDashboardContext();
 
-  if (brands.length === 1) {
+  if (!brandsError && brands.length === 1) {
     redirect(`/dashboard/brands/${brands[0].id}/preview`);
   }
 
@@ -22,7 +22,16 @@ export default async function MarketplacePreviewPage() {
         </p>
       </div>
 
-      {brands.length === 0 ? (
+      {brandsError ? (
+        <div
+          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {brandsError}
+        </div>
+      ) : null}
+
+      {!brandsError && brands.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <p className="text-slate-600">Create a brand first to preview your listing.</p>
           <Link
@@ -33,7 +42,7 @@ export default async function MarketplacePreviewPage() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      ) : (
+      ) : !brandsError ? (
         <ul className="grid gap-4 sm:grid-cols-2">
           {brands.map((brand) => (
             <li key={brand.id}>
@@ -50,7 +59,7 @@ export default async function MarketplacePreviewPage() {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }

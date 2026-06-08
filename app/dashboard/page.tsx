@@ -14,6 +14,7 @@ export default async function DashboardPage() {
     brands,
     assetsByBrandId,
     brandsError,
+    assetsError,
     stats,
     health,
     brand,
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
       health={portfolioHealth}
       brandName={brand?.business_name}
       timeline={timeline}
-      loadError={brandsError}
+      loadError={brandsError ?? assetsError}
     />
   );
 }

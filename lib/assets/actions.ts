@@ -24,6 +24,7 @@ import {
 import {
   buildStoragePath,
   buildWebpStoragePath,
+  storagePathMatchesBrand,
   validateDocumentFile,
   validateImageFile,
 } from "@/lib/assets/validation";
@@ -33,7 +34,10 @@ import { getClientBrandById } from "@/lib/brand/queries";
 import { createClientWithAccessToken } from "@/lib/supabase/authenticated-client";
 import { createClient } from "@/lib/supabase/server";
 import type { AssetActionState } from "@/types/assets";
-import { isBrandEditable } from "@/types/brand";
+import {
+  canOwnerEditBrand,
+  getOwnerEditBlockReason,
+} from "@/lib/brand/owner-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function buildUploadedAsset(
@@ -197,9 +201,11 @@ async function assertEditableBrand(brandId: string) {
     };
   }
 
-  if (!isBrandEditable(brand.status)) {
+  if (!canOwnerEditBrand(brand)) {
     return {
-      error: `Assets cannot be changed while brand status is "${brand.status}".`,
+      error:
+        getOwnerEditBlockReason(brand) ??
+        `Assets cannot be changed while brand status is "${brand.status}".`,
       profile: null,
       brand: null,
       userId: profile.id,
@@ -324,16 +330,6 @@ async function uploadLogoImpl(
     .eq("asset_type", "logo")
     .maybeSingle();
 
-  if (existingLogo) {
-    logUpload("REPLACE", { existingAssetId: existingLogo.id, path: existingLogo.storage_path });
-    await removeAssetRecord(
-      existingLogo.storage_path,
-      existingLogo.id,
-      authUserId,
-      brandId,
-    );
-  }
-
   const storagePath = buildWebpStoragePath(authUserId, brandId, "logo");
 
   logUpload("UPLOAD_READY", {
@@ -381,6 +377,16 @@ async function uploadLogoImpl(
       message: null,
       debug: msg,
     };
+  }
+
+  if (existingLogo) {
+    logUpload("REPLACE", { existingAssetId: existingLogo.id, path: existingLogo.storage_path });
+    await removeAssetRecord(
+      existingLogo.storage_path,
+      existingLogo.id,
+      authUserId,
+      brandId,
+    );
   }
 
   const signed = await createSignedPreviewUrl(storagePath);
@@ -600,12 +606,7 @@ export async function prepareBrochureUpload(
     }
 
     const existingDocs = await listBrochureAssets(brandId);
-
     const replaced = existingDocs.length > 0;
-    for (const doc of existingDocs) {
-      await removeAssetRecord(doc.storage_path, doc.id, authUserId, brandId);
-    }
-
     const storagePath = buildStoragePath(authUserId, brandId, "document", fileName);
 
     logUpload("PREPARE_BROCHURE_OK", { brandId, storagePath, replaced });
@@ -651,8 +652,8 @@ export async function finalizeBrochureUpload(
     }
     const { supabase, userId: authUserId } = uploadAuth.auth;
 
-    if (!storagePath.startsWith(`${authUserId}/`)) {
-      return failUpload("Invalid storage path.", "Path ownership mismatch", "VALIDATION");
+    if (!storagePathMatchesBrand(storagePath, authUserId, brandId)) {
+      return failUpload("Invalid storage path.", "Path brand mismatch", "VALIDATION");
     }
 
     const exists = await verifyStorageObjectExists(storagePath);
@@ -676,15 +677,21 @@ export async function finalizeBrochureUpload(
       authUserId,
     );
 
-    if (!insert.ok) {
-      await removeStorageObject(storagePath);
-      const msg = insert.error ?? "Unknown database error";
-      return { error: mapAssetError(msg, "database-insert"), message: null, debug: msg };
-    }
+  if (!insert.ok) {
+    await removeStorageObject(storagePath);
+    const msg = insert.error ?? "Unknown database error";
+    return { error: mapAssetError(msg, "database-insert"), message: null, debug: msg };
+  }
 
-    const signed = await createSignedPreviewUrl(storagePath);
-    revalidateDashboard(brandId);
-    logUpload("COMPLETE", { operation: "brochure-direct", assetId: insert.id, storagePath });
+  const existingDocs = await listBrochureAssets(brandId);
+  for (const doc of existingDocs) {
+    if (doc.id === insert.id) continue;
+    await removeAssetRecord(doc.storage_path, doc.id, authUserId, brandId);
+  }
+
+  const signed = await createSignedPreviewUrl(storagePath);
+  revalidateDashboard(brandId);
+  logUpload("COMPLETE", { operation: "brochure-direct", assetId: insert.id, storagePath });
 
     return {
       error: null,
@@ -775,11 +782,6 @@ async function uploadBrochureImpl(
   }
 
   const existingDocs = await listBrochureAssets(brandId);
-
-  for (const doc of existingDocs) {
-    await removeAssetRecord(doc.storage_path, doc.id, authUserId, brandId);
-  }
-
   const storagePath = buildStoragePath(authUserId, brandId, "document", meta.name);
 
   logUpload("UPLOAD_READY", {
@@ -816,6 +818,11 @@ async function uploadBrochureImpl(
     await removeStorageObject(storagePath);
     const msg = insert.error ?? "Unknown database error";
     return { error: mapAssetError(msg, "database-insert"), message: null, debug: msg };
+  }
+
+  for (const doc of existingDocs) {
+    if (doc.id === insert.id) continue;
+    await removeAssetRecord(doc.storage_path, doc.id, authUserId, brandId);
   }
 
   const signed = await createSignedPreviewUrl(storagePath);

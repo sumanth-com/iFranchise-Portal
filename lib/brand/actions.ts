@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getBrandAssets } from "@/lib/assets/queries";
 import { requireClient } from "@/lib/auth/session";
-import { getClientBrandById, getClientBrands } from "@/lib/brand/queries";
+import { getClientBrandById } from "@/lib/brand/queries";
 import {
   mergeBrandFormWithExisting,
   parseBrandFormData,
@@ -47,6 +48,13 @@ function getBrandIdFromForm(formData: FormData): string | null {
 async function resolveBrandRlsClient() {
   const cookieClient = await createClient();
   const {
+    data: { user },
+    error: userError,
+  } = await cookieClient.auth.getUser();
+  if (userError || !user) {
+    return { supabase: null, error: "You must be signed in to save." };
+  }
+  const {
     data: { session },
     error,
   } = await cookieClient.auth.getSession();
@@ -63,12 +71,11 @@ async function getOwnedBrand(
   userId: string,
   brandId: string | null,
 ): Promise<Brand | null> {
-  if (brandId) {
-    const result = await getClientBrandById(userId, brandId);
-    return result.brand;
+  if (!brandId) {
+    return null;
   }
-  const result = await getClientBrands(userId);
-  return result.brands[0] ?? null;
+  const result = await getClientBrandById(userId, brandId);
+  return result.brand;
 }
 
 export async function createBrand(): Promise<void> {
@@ -221,6 +228,20 @@ export async function submitBrandForReview(
     return { error: "Brand not found. Save a draft first.", message: null };
   }
 
+  const assetsResult = await getBrandAssets(existing.id);
+  if (assetsResult.error) {
+    return {
+      error: "Unable to verify brand assets. Please try again.",
+      message: null,
+    };
+  }
+  if (!assetsResult.assets.logo) {
+    return {
+      error: "A brand logo is required before submission.",
+      message: null,
+    };
+  }
+
   if (!canOwnerEditBrand(existing)) {
     return {
       error:
@@ -339,7 +360,7 @@ export async function deleteBrandById(
     .eq("user_id", profile.id);
 
   if (error) {
-    return { error: error.message || "Failed to delete brand.", message: null };
+    return { error: mapBrandSaveError(error.message), message: null };
   }
 
   revalidateBrandPaths();
@@ -439,7 +460,10 @@ export async function requestBrandUpdate(
     .eq("user_id", profile.id);
 
   if (error) {
-    return { error: error.message || "Failed to request update.", message: null };
+    return {
+      error: mapBrandSaveError(error.message),
+      message: null,
+    };
   }
 
   revalidateBrandPaths(existing.id);

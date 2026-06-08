@@ -85,3 +85,12 @@ export function buildWebpStoragePath(
 ): string {
   return `${userId}/${brandId}/${assetType}/${crypto.randomUUID()}.webp`;
 }
+
+export function storagePathMatchesBrand(
+  storagePath: string,
+  userId: string,
+  brandId: string,
+): boolean {
+  const prefix = `${userId}/${brandId}/`;
+  return storagePath.startsWith(prefix);
+}

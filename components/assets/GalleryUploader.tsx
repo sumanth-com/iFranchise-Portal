@@ -97,6 +97,7 @@ export function GalleryUploader({
           />
           <UploadProgress
             active={isPending}
+            error={isPending ? null : state.error}
             label={isDocument ? "Uploading document…" : "Uploading images…"}
           />
         </div>

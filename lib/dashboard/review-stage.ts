@@ -64,15 +64,17 @@ export function getPortfolioReviewStage(brands: Brand[]): {
   ];
   const currentIdx = order.indexOf(current);
 
-  const stages: ReviewStage[] = [
-    { id: "submitted", label: "Submitted", status: "upcoming" },
-    { id: "under_review", label: "Under Review", status: "upcoming" },
-    { id: "approved", label: "Approved", status: "upcoming" },
-    { id: "published", label: "Published", status: "upcoming" },
-  ].map((s, i) => ({
+  const stages: ReviewStage[] = (
+    [
+      { id: "submitted" as const, label: "Submitted", status: "upcoming" as const },
+      { id: "under_review" as const, label: "Under Review", status: "upcoming" as const },
+      { id: "approved" as const, label: "Approved", status: "upcoming" as const },
+      { id: "published" as const, label: "Published", status: "upcoming" as const },
+    ] satisfies ReviewStage[]
+  ).map((s, i) => ({
     ...s,
     status:
-      i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming",
+      i < currentIdx ? ("done" as const) : i === currentIdx ? ("current" as const) : ("upcoming" as const),
   }));
 
   return { label, stages };

@@ -29,12 +29,7 @@ export default async function NewBrandPage({ searchParams }: NewBrandPageProps) 
   const step = parseStep(params.step);
   const brandId = params.brandId?.trim() || null;
 
-  let profile;
-  try {
-    profile = await requireClient();
-  } catch {
-    throw new Error("Authentication required.");
-  }
+  const profile = await requireClient();
 
   const supabase = await createClient();
 

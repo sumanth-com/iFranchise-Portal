@@ -28,7 +28,7 @@ export async function updateProfileAction(
 
   if (error) {
     return {
-      error: error.message || "Failed to save profile.",
+      error: "Failed to save profile. Please try again.",
       message: null,
     };
   }

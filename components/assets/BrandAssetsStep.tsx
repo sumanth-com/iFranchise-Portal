@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -99,6 +100,7 @@ export function BrandAssetsStep({
   assetsError,
   logoError,
 }: BrandAssetsStepProps) {
+  const router = useRouter();
   const [, startUpload] = useTransition();
   const brochureReplaceRef = useRef<HTMLInputElement>(null);
   const logoReplaceRef = useRef<HTMLInputElement>(null);
@@ -142,8 +144,9 @@ export function BrandAssetsStep({
     if (logoState.uploadedAsset) {
       setLocalLogo(logoState.uploadedAsset);
       setLogoPreviewOverride(null);
+      router.refresh();
     }
-  }, [logoState.uploadedAsset]);
+  }, [logoState.uploadedAsset, router]);
 
   useEffect(() => {
     if (galleryState.uploadedAssets?.length) {
@@ -155,15 +158,17 @@ export function BrandAssetsStep({
         }
         return orderGalleryItems(merged, brandId);
       });
+      router.refresh();
     }
-  }, [galleryState.uploadedAssets, brandId]);
+  }, [galleryState.uploadedAssets, brandId, router]);
 
   useEffect(() => {
     if (brochureState.uploadedAsset) {
       setLocalBrochure(brochureState.uploadedAsset);
       setShowBrochureDropzone(false);
+      router.refresh();
     }
-  }, [brochureState.uploadedAsset]);
+  }, [brochureState.uploadedAsset, router]);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
@@ -384,7 +389,11 @@ export function BrandAssetsStep({
                 onFilesSelected={uploadLogoFile}
               />
             )}
-            <UploadProgress active={logoPending} label="Uploading logo…" />
+            <UploadProgress
+              active={logoPending}
+              error={logoPending ? null : logoState.error}
+              label="Uploading logo…"
+            />
           </>
         ) : null}
       </section>
@@ -482,7 +491,11 @@ export function BrandAssetsStep({
               hint={`Add up to ${slotsLeft} more image${slotsLeft === 1 ? "" : "s"}`}
               onFilesSelected={uploadGalleryFiles}
             />
-            <UploadProgress active={galleryPending} label="Uploading gallery…" />
+            <UploadProgress
+              active={galleryPending}
+              error={galleryPending ? null : galleryState.error}
+              label="Uploading gallery…"
+            />
           </>
         ) : editable ? (
           <p className="text-sm text-slate-500">
@@ -537,7 +550,11 @@ export function BrandAssetsStep({
                 onFilesSelected={uploadBrochureFile}
               />
             )}
-            <UploadProgress active={brochurePending} label="Uploading brochure…" />
+            <UploadProgress
+              active={brochurePending}
+              error={brochurePending ? null : brochureState.error}
+              label="Uploading brochure…"
+            />
           </>
         ) : null}
       </section>

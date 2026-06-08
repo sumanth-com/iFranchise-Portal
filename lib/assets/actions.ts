@@ -16,12 +16,14 @@ import {
   insertAssetRow,
   removeStorageObject,
   resolveFileMeta,
+  uploadOptimizedImageToStorage,
   uploadToStorage,
   verifyStorageBucket,
   verifyStorageObjectExists,
 } from "@/lib/assets/upload-pipeline";
 import {
   buildStoragePath,
+  buildWebpStoragePath,
   validateDocumentFile,
   validateImageFile,
 } from "@/lib/assets/validation";
@@ -332,7 +334,7 @@ async function uploadLogoImpl(
     );
   }
 
-  const storagePath = buildStoragePath(authUserId, brandId, "logo", meta.name);
+  const storagePath = buildWebpStoragePath(authUserId, brandId, "logo");
 
   logUpload("UPLOAD_READY", {
     userId: authUserId,
@@ -342,9 +344,14 @@ async function uploadLogoImpl(
     fileSize: meta.size,
     storagePath,
     assetType: "logo",
+    optimize: "webp",
   });
 
-  const upload = await uploadToStorage(storagePath, file, meta.type);
+  const upload = await uploadOptimizedImageToStorage(storagePath, file, {
+    maxWidth: 800,
+    maxHeight: 800,
+    quality: 85,
+  });
   if (!upload.ok) {
     const msg = upload.error ?? "Unknown storage error";
     return {
@@ -360,8 +367,8 @@ async function uploadLogoImpl(
       asset_type: "logo",
       storage_path: storagePath,
       file_name: meta.name,
-      mime_type: meta.type,
-      file_size: meta.size,
+      mime_type: upload.optimized.mimeType,
+      file_size: upload.optimized.sizeBytes,
     },
     authUserId,
   );
@@ -391,7 +398,11 @@ async function uploadLogoImpl(
           brandId,
           "logo",
           storagePath,
-          meta,
+          {
+            name: meta.name,
+            type: upload.optimized.mimeType,
+            size: upload.optimized.sizeBytes,
+          },
           signed.url,
         )
       : null,
@@ -474,8 +485,12 @@ async function uploadGalleryImagesImpl(
       return failUpload(validationError, validationError, "VALIDATION");
     }
 
-    const storagePath = buildStoragePath(authUserId, brandId, "gallery", meta.name);
-    const upload = await uploadToStorage(storagePath, file, meta.type);
+    const storagePath = buildWebpStoragePath(authUserId, brandId, "gallery");
+    const upload = await uploadOptimizedImageToStorage(storagePath, file, {
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 82,
+    });
 
     if (!upload.ok) {
       const msg = upload.error ?? "Unknown storage error";
@@ -488,8 +503,8 @@ async function uploadGalleryImagesImpl(
         asset_type: "gallery",
         storage_path: storagePath,
         file_name: meta.name,
-        mime_type: meta.type,
-        file_size: meta.size,
+        mime_type: upload.optimized.mimeType,
+        file_size: upload.optimized.sizeBytes,
       },
       authUserId,
     );
@@ -503,7 +518,11 @@ async function uploadGalleryImagesImpl(
     const signed = await createSignedPreviewUrl(storagePath);
     if (insert.id) {
       uploadedAssets.push(
-        buildUploadedAsset(insert.id, brandId, "gallery", storagePath, meta, signed.url),
+        buildUploadedAsset(insert.id, brandId, "gallery", storagePath, {
+          name: meta.name,
+          type: upload.optimized.mimeType,
+          size: upload.optimized.sizeBytes,
+        }, signed.url),
       );
     }
 
@@ -950,8 +969,12 @@ export async function uploadGalleryImagesLegacy(
     );
     if (validationError) return failUpload(validationError, validationError, "VALIDATION");
 
-    const storagePath = buildStoragePath(authUserId, brandId, assetType, meta.name);
-    const upload = await uploadToStorage(storagePath, file, meta.type);
+    const storagePath = buildWebpStoragePath(authUserId, brandId, assetType);
+    const upload = await uploadOptimizedImageToStorage(storagePath, file, {
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 82,
+    });
     if (!upload.ok) {
       const msg = upload.error ?? "Storage error";
       return { error: mapAssetError(msg, "storage-upload"), message: null, debug: msg };
@@ -963,8 +986,8 @@ export async function uploadGalleryImagesLegacy(
         asset_type: assetType,
         storage_path: storagePath,
         file_name: meta.name,
-        mime_type: meta.type,
-        file_size: meta.size,
+        mime_type: upload.optimized.mimeType,
+        file_size: upload.optimized.sizeBytes,
       },
       authUserId,
     );

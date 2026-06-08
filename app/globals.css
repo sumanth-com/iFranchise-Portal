@@ -290,6 +290,94 @@ body {
   animation: earth-avatar-glow 2.8s ease-in-out infinite;
 }
 
+/* Sidebar nav icon micro-interactions (hover only) */
+@keyframes nav-bell-swing {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(14deg);
+  }
+  75% {
+    transform: rotate(-10deg);
+  }
+}
+
+@keyframes nav-eye-blink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.1);
+  }
+}
+
+.group:hover .nav-icon-swing {
+  animation: nav-bell-swing 0.35s ease-in-out 1;
+}
+
+.group:hover .nav-icon-blink {
+  animation: nav-eye-blink 0.22s ease-in-out 1;
+}
+
+/* Sidebar icon micro-animations (hover only) */
+@keyframes nav-bell-swing {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(14deg);
+  }
+  75% {
+    transform: rotate(-10deg);
+  }
+}
+
+@keyframes nav-eye-blink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.1);
+  }
+}
+
+.group:hover .nav-icon-swing {
+  animation: nav-bell-swing 0.35s ease-in-out 1;
+}
+
+.group:hover .nav-icon-blink {
+  animation: nav-eye-blink 0.22s ease-in-out 1;
+}
+
+/* Portal page rhythm — shared across dashboard sections */
+[data-dashboard="client"] .portal-page {
+  --portal-gap: 1.5rem;
+}
+
+[data-dashboard="client"] .portal-page > * + * {
+  margin-top: var(--portal-gap);
+}
+
+/* Top header — always purple regardless of theme */
+[data-dashboard="client"] .client-topbar {
+  background: linear-gradient(90deg, #6d28d9 0%, #5b21b6 50%, #4f46e5 100%) !important;
+  border-bottom-color: rgba(91, 33, 182, 0.45) !important;
+}
+
+[data-dashboard="client"] .client-topbar h1,
+[data-dashboard="client"] .client-topbar p {
+  color: #ffffff !important;
+}
+
+[data-dashboard="client"] .client-topbar p {
+  opacity: 0.8;
+}
+
 /* Dark mode — Brand Owner dashboard (Settings → Appearance) */
 html.dark [data-dashboard="client"] {
   background-color: #0f172a;

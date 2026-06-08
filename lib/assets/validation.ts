@@ -6,6 +6,7 @@ import type { AssetType } from "@/types/assets";
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
 ]);
@@ -74,4 +75,13 @@ export function buildStoragePath(
   const extension = getFileExtension(fileName) || ".jpg";
   const id = crypto.randomUUID();
   return `${userId}/${brandId}/${assetType}/${id}${extension}`;
+}
+
+/** Storage path for server-optimized WebP images (logo, gallery, etc.). */
+export function buildWebpStoragePath(
+  userId: string,
+  brandId: string,
+  assetType: AssetType,
+): string {
+  return `${userId}/${brandId}/${assetType}/${crypto.randomUUID()}.webp`;
 }

@@ -2,12 +2,18 @@
 
 export type ThemeMode = "light" | "dark" | "system";
 
+export type BrandDefaultView = "grid" | "list";
+
 export type SettingsPreferences = {
   emailAlerts: boolean;
+  platformNotifications: boolean;
   reviewUpdates: boolean;
   approvalUpdates: boolean;
   marketplaceMessages: boolean;
   theme: ThemeMode;
+  defaultBrandView: BrandDefaultView;
+  showTimeline: boolean;
+  compactDashboard: boolean;
 };
 
 const KEY = "ifranchise-settings";
@@ -15,10 +21,14 @@ const KEY = "ifranchise-settings";
 export function defaultSettings(): SettingsPreferences {
   return {
     emailAlerts: true,
+    platformNotifications: true,
     reviewUpdates: true,
     approvalUpdates: true,
     marketplaceMessages: true,
     theme: "light",
+    defaultBrandView: "grid",
+    showTimeline: true,
+    compactDashboard: false,
   };
 }
 

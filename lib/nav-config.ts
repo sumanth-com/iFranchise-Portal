@@ -2,14 +2,15 @@
 
 export type NavIconName =
   | "layoutDashboard"
-  | "building2"
-  | "plus"
+  | "sparkles"
+  | "store"
   | "eye"
   | "messageSquare"
   | "bell"
   | "settings"
   | "lifeBuoy"
-  | "store"
+  | "building2"
+  | "plus"
   | "clipboardList"
   | "users";
 
@@ -19,7 +20,6 @@ export type NavItem = {
   icon: NavIconName;
   mobileLabel?: string;
   section?: string;
-  /** Nested items shown indented under this entry */
   children?: NavItem[];
 };
 
@@ -28,6 +28,7 @@ export type ClientNavGroup = {
   items: NavItem[];
 };
 
+/** Brand Owner sidebar — Create Brand before My Brands for new-user flow. */
 export const clientNavGroups: ClientNavGroup[] = [
   {
     label: "",
@@ -38,27 +39,18 @@ export const clientNavGroups: ClientNavGroup[] = [
         icon: "layoutDashboard",
         mobileLabel: "Home",
       },
-    ],
-  },
-  {
-    label: "Brands",
-    items: [
+      {
+        href: "/dashboard/brands/new",
+        label: "Create Brand",
+        icon: "plus",
+        mobileLabel: "Create",
+      },
       {
         href: "/dashboard/brands",
         label: "My Brands",
         icon: "store",
         mobileLabel: "Brands",
       },
-      {
-        href: "/dashboard/brands/new",
-        label: "Create Brand",
-        icon: "plus",
-      },
-    ],
-  },
-  {
-    label: "",
-    items: [
       {
         href: "/dashboard/marketplace-preview",
         label: "Marketplace Preview",
@@ -76,11 +68,6 @@ export const clientNavGroups: ClientNavGroup[] = [
         icon: "bell",
         mobileLabel: "Alerts",
       },
-    ],
-  },
-  {
-    label: "",
-    items: [
       {
         href: "/dashboard/settings",
         label: "Settings",

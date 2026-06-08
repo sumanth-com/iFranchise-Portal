@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Circle } from "lucide-react";
+import { Check } from "lucide-react";
 import Link from "next/link";
 
 import { GlassCard } from "@/components/dashboard/client/glass-card";
@@ -37,34 +37,40 @@ export function BrandHealthWidget({ health, brandName }: BrandHealthWidgetProps)
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${health.completion}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           className="h-full rounded-full bg-gradient-to-r from-[#6D28D9] to-[#4F46E5]"
         />
       </div>
 
-      <ul className="mt-5 space-y-2">
-        {health.items.map((item) => (
-          <li key={item.id}>
+      <ul className="mt-5 flex flex-wrap gap-2">
+        {health.items.map((item, index) => (
+          <motion.li
+            key={item.id}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.04, duration: 0.25 }}
+          >
             <Link
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors",
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:scale-[1.03]",
                 item.complete
-                  ? "text-slate-500"
-                  : "bg-amber-50/80 text-amber-900 hover:bg-amber-50",
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm hover:bg-emerald-100"
+                  : "border border-red-200 bg-red-50 text-red-700 shadow-sm hover:bg-red-100",
               )}
             >
               {item.complete ? (
-                <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                </span>
               ) : (
-                <Circle className="h-4 w-4 shrink-0 text-amber-500" />
+                <span className="flex h-4 w-4 items-center justify-center text-sm font-bold leading-none text-red-600">
+                  *
+                </span>
               )}
-              <span className={item.complete ? "line-through" : "font-medium"}>
-                {item.complete ? "" : "Missing "}
-                {item.label}
-              </span>
+              <span>{item.complete ? item.label : `Missing ${item.label}`}</span>
             </Link>
-          </li>
+          </motion.li>
         ))}
       </ul>
 

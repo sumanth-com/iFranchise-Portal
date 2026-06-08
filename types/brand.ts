@@ -85,8 +85,13 @@ export function isBrandLocked(status: BrandStatus): boolean {
   return status === "approved";
 }
 
-export function brandEditPath(brandId: string, step = 1): string {
-  return `/dashboard/brands/${brandId}/edit?step=${step}`;
+/** Edit route — omit `step` to auto-resume at last completed wizard step. */
+export function brandEditPath(brandId: string, step?: number): string {
+  const base = `/dashboard/brands/${brandId}/edit`;
+  if (step == null || step < 1) {
+    return base;
+  }
+  return `${base}?step=${step}`;
 }
 
 export function brandNewPath(brandId?: string | null, step = 1): string {

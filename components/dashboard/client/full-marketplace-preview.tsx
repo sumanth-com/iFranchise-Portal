@@ -47,6 +47,8 @@ export function FullMarketplacePreview({
             unoptimized
             className="object-cover"
             priority
+            fetchPriority="high"
+            sizes="(max-width: 1024px) 100vw, 1200px"
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -135,7 +137,15 @@ export function FullMarketplacePreview({
                     key={url}
                     className="relative aspect-[4/3] overflow-hidden rounded-xl"
                   >
-                    <Image src={url} alt="" fill unoptimized className="object-cover" />
+                    <Image
+                      src={url}
+                      alt=""
+                      fill
+                      unoptimized
+                      loading="lazy"
+                      sizes="(max-width: 640px) 50vw, 200px"
+                      className="object-cover"
+                    />
                   </div>
                 ))}
               </div>

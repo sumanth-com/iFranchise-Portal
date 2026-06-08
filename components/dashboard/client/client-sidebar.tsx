@@ -21,12 +21,10 @@ function NavLink({
   item,
   pathname,
   collapsed,
-  nested = false,
 }: {
   item: NavItem;
   pathname: string;
   collapsed: boolean;
-  nested?: boolean;
 }) {
   const active = isNavItemActive(pathname, item.href);
 
@@ -34,28 +32,28 @@ function NavLink({
     <Link
       href={item.href}
       className={cn(
-        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-        nested && !collapsed && "ml-3 py-2",
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
         active
-          ? "text-[#6D28D9]"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-        collapsed && "justify-center px-2",
+          ? "text-white shadow-[0_6px_20px_rgba(109,40,217,0.42)]"
+          : "text-slate-600 hover:scale-[1.02] hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm",
+        collapsed && "justify-center px-2.5",
       )}
     >
       {active ? (
         <motion.span
           layoutId="client-nav-active"
-          className="absolute inset-0 rounded-xl bg-[#F5F3FF] ring-1 ring-[#DDD6FE]"
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#6D28D9] via-[#5B21B6] to-[#4F46E5]"
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
         />
       ) : null}
-      <NavIcon
-        name={item.icon}
+      <span
         className={cn(
-          "relative z-10 h-4 w-4 shrink-0",
-          active ? "text-[#6D28D9]" : "text-slate-500",
+          "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+          active ? "text-white" : "text-slate-500 group-hover:text-[#6D28D9]",
         )}
-      />
+      >
+        <NavIcon name={item.icon} active={active} />
+      </span>
       {!collapsed ? (
         <span className="relative z-10 flex-1 truncate">{item.label}</span>
       ) : null}
@@ -91,7 +89,7 @@ export function ClientSidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-50 lg:block"
+          className="hidden rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 lg:block"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
@@ -102,27 +100,20 @@ export function ClientSidebar({
         </button>
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-3">
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3">
         {groups.map((group, groupIndex) => (
           <div
             key={group.label || group.items[0]?.href || `nav-group-${groupIndex}`}
-            className="mb-2"
+            className="space-y-0.5"
           >
-            {!collapsed && group.label ? (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                {group.label}
-              </p>
-            ) : null}
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  pathname={pathname}
-                  collapsed={collapsed}
-                />
-              ))}
-            </div>
+            {group.items.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                collapsed={collapsed}
+              />
+            ))}
           </div>
         ))}
       </nav>

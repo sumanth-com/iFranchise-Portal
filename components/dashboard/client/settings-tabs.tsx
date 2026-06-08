@@ -2,12 +2,17 @@
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { GlassCard } from "@/components/dashboard/client/glass-card";
+import { PortalPageHeader } from "@/components/dashboard/client/portal-page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { formatDateTime } from "@/lib/format-date";
+import { updateProfileAction } from "@/lib/profile/actions";
+import { initialProfileActionState } from "@/lib/profile/types";
 import {
+  clearProfileAvatar,
+  cropImageToSquare,
   loadProfileExtras,
   saveProfileExtras,
 } from "@/lib/profile/client-preferences";
@@ -19,8 +24,21 @@ import {
   type ThemeMode,
 } from "@/lib/settings/client-preferences";
 import { cn } from "@/lib/utils";
-import { Bell, Lock, Monitor, Moon, Palette, Sun, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  Bell,
+  Briefcase,
+  Camera,
+  LayoutGrid,
+  List,
+  Lock,
+  Monitor,
+  Moon,
+  Sun,
+  Trash2,
+  User,
+} from "lucide-react";
+import Image from "next/image";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 type SettingsTabsProps = {
   userId: string;
@@ -29,14 +47,16 @@ type SettingsTabsProps = {
   createdAt: string;
 };
 
-const TABS = [
-  { id: "account", label: "Account", icon: User },
+const SECTIONS = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "account", label: "Account", icon: Lock },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "security", label: "Security", icon: Lock },
-  { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "preferences", label: "Preferences", icon: Briefcase },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+const SUCCESS_TOAST = "Changes saved successfully.";
 
 export function SettingsTabs({
   userId,
@@ -45,75 +65,116 @@ export function SettingsTabs({
   createdAt,
 }: SettingsTabsProps) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<TabId>("account");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [active, setActive] = useState<SectionId>("profile");
   const [prefs, setPrefs] = useState<SettingsPreferences>(() =>
     loadSettings(userId),
   );
-  const [account, setAccount] = useState(() => {
-    const extras = loadProfileExtras(userId);
-    return {
-      name: fullName ?? "",
-      phone: extras.phone,
-      company: extras.companyName,
-      location: extras.location,
-    };
-  });
+  const [name, setName] = useState(fullName ?? "");
+  const [phone, setPhone] = useState("");
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const [profileState, profileAction, profilePending] = useActionState(
+    updateProfileAction,
+    initialProfileActionState,
+  );
 
   useEffect(() => {
-    setPrefs(loadSettings(userId));
     const extras = loadProfileExtras(userId);
-    setAccount({
-      name: fullName ?? "",
-      phone: extras.phone,
-      company: extras.companyName,
-      location: extras.location,
-    });
+    setPrefs(loadSettings(userId));
+    setPhone(extras.phone);
+    setAvatarUrl(extras.avatarDataUrl);
+    setName(fullName ?? "");
     applyTheme(loadSettings(userId).theme);
+    setReady(true);
   }, [userId, fullName]);
 
-  const savePrefs = (next: SettingsPreferences) => {
+  useEffect(() => {
+    if (profileState.message) toast(SUCCESS_TOAST, "success");
+    if (profileState.error) toast(profileState.error, "error");
+  }, [profileState.message, profileState.error, toast]);
+
+  const displayAvatar = previewAvatar ?? avatarUrl;
+  const initials = (name || email).slice(0, 2).toUpperCase();
+
+  const savePrefs = (next: SettingsPreferences, message = SUCCESS_TOAST) => {
     setPrefs(next);
     saveSettings(userId, next);
     applyTheme(next.theme);
-    toast("Preferences saved.", "success");
+    toast(message, "success");
   };
 
-  const saveAccount = () => {
-    const extras = loadProfileExtras(userId);
-    saveProfileExtras(userId, {
-      ...extras,
-      phone: account.phone,
-      companyName: account.company,
-      location: account.location,
-    });
-    toast("Account details saved locally.", "success");
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Please select an image file.", "error");
+      return;
+    }
+    try {
+      const cropped = await cropImageToSquare(file);
+      setPreviewAvatar(cropped);
+    } catch {
+      toast("Could not process image.", "error");
+    }
+    e.target.value = "";
   };
+
+  const persistProfileExtras = () => {
+    const extras = loadProfileExtras(userId);
+    const nextAvatar = previewAvatar ?? extras.avatarDataUrl;
+    saveProfileExtras(userId, { ...extras, phone, avatarDataUrl: nextAvatar });
+    setAvatarUrl(nextAvatar);
+    setPreviewAvatar(null);
+    window.dispatchEvent(new CustomEvent("profile-updated"));
+  };
+
+  const handleRemoveAvatar = () => {
+    clearProfileAvatar(userId);
+    setPreviewAvatar(null);
+    setAvatarUrl(null);
+    window.dispatchEvent(new CustomEvent("profile-updated"));
+    toast("Profile photo removed.", "info");
+  };
+
+  const scrollTo = (id: SectionId) => {
+    setActive(id);
+    document.getElementById(`settings-${id}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  if (!ready) {
+    return (
+      <div className="portal-page animate-pulse space-y-6">
+        <div className="h-24 rounded-2xl bg-slate-100" />
+        <div className="h-64 rounded-2xl bg-slate-100" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
-          Preferences
-        </p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-          Settings
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Manage your account, notifications, security, and appearance.
-        </p>
-      </div>
+    <div className="portal-page space-y-6">
+      <PortalPageHeader
+        eyebrow="Preferences"
+        title="Settings"
+        description="Manage your profile, account security, notifications, and portal preferences."
+      />
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 lg:w-56 lg:flex-col">
-          {TABS.map(({ id, label, icon: Icon }) => (
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <nav className="flex shrink-0 gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 lg:sticky lg:top-0 lg:w-52 lg:flex-col">
+          {SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => scrollTo(id)}
               className={cn(
-                "flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                tab === id
-                  ? "bg-[#6D28D9]/10 text-[#6D28D9] shadow-sm"
+                "flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                active === id
+                  ? "bg-gradient-to-r from-[#6D28D9] to-[#5B21B6] text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-50",
               )}
             >
@@ -123,180 +184,232 @@ export function SettingsTabs({
           ))}
         </nav>
 
-        <GlassCard padding="lg" className="min-w-0 flex-1">
-          {tab === "account" && (
-            <div className="space-y-5">
-              <h2 className="text-base font-semibold text-slate-900">Account</h2>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="settings-name">Name</Label>
-                  <Input
-                    id="settings-name"
-                    value={account.name}
-                    onChange={(e) =>
-                      setAccount((p) => ({ ...p, name: e.target.value }))
-                    }
-                    disabled
-                    className="bg-slate-50"
+        <div className="min-w-0 flex-1 space-y-5">
+          <GlassCard id="settings-profile" padding="lg">
+            <h2 className="text-base font-semibold text-slate-900">Profile</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your public identity across the iFranchise portal.
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-5">
+              <div className="relative">
+                {displayAvatar ? (
+                  <Image
+                    src={displayAvatar}
+                    alt=""
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-20 w-20 rounded-2xl object-cover ring-2 ring-[#6D28D9]/15"
                   />
-                  <p className="text-xs text-slate-400">
-                    Edit name on{" "}
-                    <a href="/dashboard/profile" className="text-[#6D28D9]">
-                      My Profile
-                    </a>
-                    .
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="settings-email">Email</Label>
-                  <Input
-                    id="settings-email"
-                    value={email}
-                    disabled
-                    className="bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="settings-phone">Phone</Label>
-                  <Input
-                    id="settings-phone"
-                    value={account.phone}
-                    onChange={(e) =>
-                      setAccount((p) => ({ ...p, phone: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="settings-company">Company</Label>
-                  <Input
-                    id="settings-company"
-                    value={account.company}
-                    onChange={(e) =>
-                      setAccount((p) => ({ ...p, company: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="settings-location">Location</Label>
-                  <Input
-                    id="settings-location"
-                    value={account.location}
-                    onChange={(e) =>
-                      setAccount((p) => ({ ...p, location: e.target.value }))
-                    }
-                  />
-                </div>
+                ) : (
+                  <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6D28D9] to-[#4F46E5] text-lg font-bold text-white shadow-md">
+                    {initials}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:text-[#6D28D9]"
+                  aria-label="Change photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </div>
-              <Button type="button" onClick={saveAccount}>
-                Save account details
-              </Button>
+              {displayAvatar ? (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:underline"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remove photo
+                </button>
+              ) : null}
             </div>
-          )}
 
-          {tab === "notifications" && (
-            <div className="space-y-5">
-              <h2 className="text-base font-semibold text-slate-900">
-                Notifications
-              </h2>
-              <ToggleRow
-                label="Email alerts"
-                description="Receive important updates via email."
-                checked={prefs.emailAlerts}
-                onChange={(v) => savePrefs({ ...prefs, emailAlerts: v })}
-              />
-              <ToggleRow
-                label="Review updates"
-                description="When an admin reviews your brand submission."
-                checked={prefs.reviewUpdates}
-                onChange={(v) => savePrefs({ ...prefs, reviewUpdates: v })}
-              />
-              <ToggleRow
-                label="Approval updates"
-                description="When your brand is approved or rejected."
-                checked={prefs.approvalUpdates}
-                onChange={(v) => savePrefs({ ...prefs, approvalUpdates: v })}
-              />
-              <ToggleRow
-                label="Marketplace messages"
-                description="Inquiries and messages from the marketplace."
-                checked={prefs.marketplaceMessages}
-                onChange={(v) =>
-                  savePrefs({ ...prefs, marketplaceMessages: v })
-                }
-              />
-            </div>
-          )}
+            <form
+              action={profileAction}
+              onSubmit={() => {
+                persistProfileExtras();
+              }}
+              className="mt-6 grid gap-5 sm:grid-cols-2"
+            >
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="settings-name">Name</Label>
+                <Input
+                  id="settings-name"
+                  name="full_name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="settings-email">Email</Label>
+                <Input
+                  id="settings-email"
+                  value={email}
+                  disabled
+                  className="bg-slate-50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="settings-phone">Phone</Label>
+                <Input
+                  id="settings-phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Button type="submit" disabled={profilePending}>
+                  {profilePending ? "Saving…" : "Save profile"}
+                </Button>
+              </div>
+            </form>
+          </GlassCard>
 
-          {tab === "security" && (
-            <div className="space-y-5">
-              <h2 className="text-base font-semibold text-slate-900">
-                Security
-              </h2>
+          <GlassCard id="settings-account" padding="lg">
+            <h2 className="text-base font-semibold text-slate-900">Account</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Password and session security for your account.
+            </p>
+            <div className="mt-6 space-y-4">
               <div className="rounded-xl border border-slate-200 px-4 py-4">
-                <p className="text-sm font-medium text-slate-900">
-                  Change password
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="text-sm font-medium text-slate-900">Password</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   Use the forgot password flow on the login page to reset your
-                  password.
+                  password securely.
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200 px-4 py-4">
-                <p className="text-sm font-medium text-slate-900">Last login</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Member since {formatDateTime(createdAt) ?? createdAt}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200 px-4 py-4">
-                <p className="text-sm font-medium text-slate-900">
-                  Active sessions
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  You are signed in on this device. Sign out to end your
-                  session.
+                <p className="text-sm font-medium text-slate-900">Security</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Member since {formatDateTime(createdAt) ?? createdAt}. You are
+                  signed in on this device.
                 </p>
                 <div className="mt-4">
                   <LogoutButton />
                 </div>
               </div>
             </div>
-          )}
+          </GlassCard>
 
-          {tab === "appearance" && (
-            <div className="space-y-5">
-              <h2 className="text-base font-semibold text-slate-900">
-                Appearance
-              </h2>
-              <p className="text-sm text-slate-500">
-                Choose how the portal looks on your device.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {(
-                  [
-                    { id: "light", label: "Light mode", icon: Sun },
-                    { id: "dark", label: "Dark mode", icon: Moon },
-                    { id: "system", label: "System mode", icon: Monitor },
-                  ] as const
-                ).map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => savePrefs({ ...prefs, theme: id as ThemeMode })}
-                    className={cn(
-                      "flex flex-col items-center gap-2 rounded-2xl border px-4 py-5 text-sm font-medium transition-all hover:shadow-md",
-                      prefs.theme === id
-                        ? "border-[#6D28D9] bg-[#6D28D9]/5 text-[#6D28D9] ring-2 ring-[#6D28D9]/20"
-                        : "border-slate-200 text-slate-600 hover:border-slate-300",
-                    )}
-                  >
-                    <Icon className="h-6 w-6" />
-                    {label}
-                  </button>
-                ))}
+          <GlassCard id="settings-notifications" padding="lg">
+            <h2 className="text-base font-semibold text-slate-900">
+              Notifications
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Choose how you receive updates about your listings.
+            </p>
+            <div className="mt-6 space-y-3">
+              <ToggleRow
+                label="Email notifications"
+                description="Receive important updates and review outcomes via email."
+                checked={prefs.emailAlerts}
+                onChange={(v) => savePrefs({ ...prefs, emailAlerts: v })}
+              />
+              <ToggleRow
+                label="Platform notifications"
+                description="Show in-app alerts for submissions, reviews, and marketplace activity."
+                checked={prefs.platformNotifications}
+                onChange={(v) =>
+                  savePrefs({ ...prefs, platformNotifications: v })
+                }
+              />
+            </div>
+          </GlassCard>
+
+          <GlassCard id="settings-preferences" padding="lg">
+            <h2 className="text-base font-semibold text-slate-900">
+              Preferences
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Dashboard layout and appearance defaults.
+            </p>
+
+            <div className="mt-6 space-y-6">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-slate-900">Default view</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(
+                    [
+                      { id: "grid", label: "Grid view", icon: LayoutGrid },
+                      { id: "list", label: "List view", icon: List },
+                    ] as const
+                  ).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() =>
+                        savePrefs({ ...prefs, defaultBrandView: id })
+                      }
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border px-4 py-3.5 text-sm font-medium transition-all duration-200",
+                        prefs.defaultBrandView === id
+                          ? "border-[#6D28D9] bg-[#6D28D9]/5 text-[#6D28D9] ring-1 ring-[#6D28D9]/20"
+                          : "border-slate-200 text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <ToggleRow
+                label="Show activity timeline"
+                description="Display submission timeline on your dashboard home."
+                checked={prefs.showTimeline}
+                onChange={(v) => savePrefs({ ...prefs, showTimeline: v })}
+              />
+              <ToggleRow
+                label="Compact dashboard"
+                description="Use a denser layout for stats and portfolio widgets."
+                checked={prefs.compactDashboard}
+                onChange={(v) => savePrefs({ ...prefs, compactDashboard: v })}
+              />
+
+              <div className="space-y-3 border-t border-slate-100 pt-6">
+                <p className="text-sm font-medium text-slate-900">Appearance</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      { id: "light", label: "Light", icon: Sun },
+                      { id: "dark", label: "Dark", icon: Moon },
+                      { id: "system", label: "System", icon: Monitor },
+                    ] as const
+                  ).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() =>
+                        savePrefs({ ...prefs, theme: id as ThemeMode })
+                      }
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border px-4 py-4 text-sm font-medium transition-all duration-200",
+                        prefs.theme === id
+                          ? "border-[#6D28D9] bg-[#6D28D9]/5 text-[#6D28D9] ring-1 ring-[#6D28D9]/20"
+                          : "border-slate-200 text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          )}
-        </GlassCard>
+          </GlassCard>
+        </div>
       </div>
     </div>
   );
@@ -314,7 +427,7 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 px-4 py-4 transition-colors hover:bg-slate-50/80">
+    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 px-4 py-4 transition-colors duration-200 hover:bg-slate-50/80">
       <div>
         <p className="text-sm font-medium text-slate-900">{label}</p>
         <p className="mt-0.5 text-xs text-slate-500">{description}</p>
@@ -325,13 +438,13 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200",
           checked ? "bg-[#6D28D9]" : "bg-slate-200",
         )}
       >
         <span
           className={cn(
-            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200",
             checked ? "translate-x-5" : "translate-x-0.5",
           )}
         />

@@ -32,8 +32,9 @@ export function GlassCard({
       whileHover={hover ? { y: -2 } : undefined}
       transition={{ duration: 0.2 }}
       className={cn(
-        "dash-card rounded-2xl border border-neutral-300 bg-white text-black shadow-[0_2px_12px_rgba(0,0,0,0.06)]",
-        hover && "transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)]",
+        "dash-card rounded-2xl border border-slate-200/90 bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.06),0_4px_16px_rgba(15,23,42,0.04)]",
+        hover &&
+          "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(15,23,42,0.08),0_8px_24px_rgba(15,23,42,0.06)]",
         paddingClass[padding],
         className,
       )}

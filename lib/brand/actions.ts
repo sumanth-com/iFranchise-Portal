@@ -20,6 +20,10 @@ import {
 import { createClientWithAccessToken } from "@/lib/supabase/authenticated-client";
 import { createClient } from "@/lib/supabase/server";
 import type { Brand, BrandActionState } from "@/types/brand";
+import {
+  canOwnerEditBrand,
+  getOwnerEditBlockReason,
+} from "@/lib/brand/owner-access";
 import { brandEditPath, isBrandEditable, isBrandLocked } from "@/types/brand";
 
 function revalidateBrandPaths(brandId?: string) {
@@ -118,9 +122,19 @@ export async function saveBrandDraft(
     return { error: validationError, message: null };
   }
 
-  if (existing && !isBrandEditable(existing.status)) {
+  if (brandId && !existing) {
     return {
-      error: "This brand is locked while approved. Request an update to make changes.",
+      error: "Brand not found. Cannot save changes to this listing.",
+      message: null,
+      brandId: null,
+    };
+  }
+
+  if (existing && !canOwnerEditBrand(existing)) {
+    return {
+      error:
+        getOwnerEditBlockReason(existing) ??
+        "This brand cannot be edited in its current status.",
       message: null,
     };
   }
@@ -207,9 +221,11 @@ export async function submitBrandForReview(
     return { error: "Brand not found. Save a draft first.", message: null };
   }
 
-  if (!isBrandEditable(existing.status)) {
+  if (!canOwnerEditBrand(existing)) {
     return {
-      error: "This brand cannot be submitted in its current status.",
+      error:
+        getOwnerEditBlockReason(existing) ??
+        "This brand cannot be submitted in its current status.",
       message: null,
     };
   }

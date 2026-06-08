@@ -1,33 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
   Building2,
+  Lock,
   MapPin,
+  Pencil,
   Store,
   Wallet,
 } from "lucide-react";
 
-import { buildMarketplaceListing, displayStatusLabel } from "@/lib/dashboard/listing-data";
-import type { Brand, BrandStatus } from "@/types/brand";
+import { BrandPortfolioStatusBadge } from "@/components/dashboard/client/brand-portfolio-status-badge";
+import { canOwnerEditBrand } from "@/lib/brand/owner-access";
+import { buildMarketplaceListing } from "@/lib/dashboard/listing-data";
+import { resolveBrandDisplayStatus } from "@/lib/dashboard/brand-display-status";
+import { formatDate, formatRelativeTime } from "@/lib/format-date";
+import { brandEditPath } from "@/types/brand";
+import type { Brand } from "@/types/brand";
 import type { BrandAssetsBundle } from "@/types/assets";
-import { cn } from "@/lib/utils";
 
 type BrandPortfolioCardProps = {
   brand: Brand;
   assets: BrandAssetsBundle;
   index?: number;
-};
-
-const STATUS_STYLES: Record<BrandStatus, string> = {
-  draft: "bg-white/95 text-slate-700 shadow-sm",
-  submitted: "bg-amber-50/95 text-amber-800 shadow-sm",
-  changes_requested: "bg-orange-50/95 text-orange-800 shadow-sm",
-  approved: "bg-emerald-50/95 text-emerald-800 shadow-sm",
-  rejected: "bg-rose-50/95 text-rose-800 shadow-sm",
 };
 
 export function BrandPortfolioCard({
@@ -37,92 +36,136 @@ export function BrandPortfolioCard({
 }: BrandPortfolioCardProps) {
   const listing = buildMarketplaceListing(brand, assets);
   const previewHref = `/dashboard/brands/${brand.id}/preview`;
+  const editHref = brandEditPath(brand.id);
+  const displayStatus = resolveBrandDisplayStatus(brand);
+  const canEdit = canOwnerEditBrand(brand);
   const bannerImage = listing.galleryUrls[0] ?? null;
-  const tags = buildTags(brand, listing.category, listing.industry);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const dateLabel = [
+    brand.submitted_at ? `Submitted ${formatDate(brand.submitted_at)}` : null,
+    brand.updated_at
+      ? mounted
+        ? `Updated ${formatRelativeTime(brand.updated_at)}`
+        : `Updated ${formatDate(brand.updated_at)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
+    <motion.article
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
-      className="h-full"
+      className="group mx-auto flex w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-shadow duration-300 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)]"
     >
-      <Link
-        href={previewHref}
-        className="group flex h-full max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-[#6D28D9]/20 hover:shadow-[0_16px_40px_rgba(109,40,217,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
-      >
-        {/* Banner */}
-        <div className="relative aspect-[5/3] shrink-0 overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50">
-          {bannerImage ? (
-            <Image
-              src={bannerImage}
-              alt=""
-              fill
-              unoptimized
-              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#6D28D9]/10 via-slate-50 to-slate-100">
-              <Building2 className="h-14 w-14 text-slate-300" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <span
-            className={cn(
-              "absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm",
-              STATUS_STYLES[brand.status],
-            )}
-          >
-            {displayStatusLabel(brand.status)}
-          </span>
+      {/* Cover — 3:2 ratio shows the full banner without heavy cropping */}
+      <div className="relative aspect-[3/2] shrink-0 overflow-hidden bg-slate-50">
+        {bannerImage ? (
+          <Image
+            src={bannerImage}
+            alt=""
+            fill
+            unoptimized
+            loading={index === 0 ? "eager" : "lazy"}
+            sizes="440px"
+            className="object-contain object-center transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#6D28D9]/10 via-slate-50 to-slate-100">
+            <Building2 className="h-10 w-10 text-slate-300/80" />
+          </div>
+        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent" />
+
+        <div className="absolute right-2.5 top-2.5">
+          <BrandPortfolioStatusBadge brand={brand} />
         </div>
+      </div>
 
-        {/* Body */}
-        <div className="flex flex-1 flex-col p-4 sm:p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6D28D9]">
-            {listing.category || listing.industry || "Franchise"}
-          </p>
-          <h3 className="mt-1 line-clamp-2 text-base font-bold tracking-tight text-slate-900 sm:text-lg">
-            {listing.businessName}
-          </h3>
-          {listing.tagline ? (
-            <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-              {listing.tagline}
-            </p>
-          ) : null}
-
-          <div className="mt-3 grid grid-cols-3 gap-2 border-y border-slate-100 py-3 sm:mt-4 sm:gap-3 sm:py-4">
-            <Stat label="Investment" value={listing.investmentLabel} icon={Wallet} />
-            <Stat label="Model" value={listing.modelLabel} icon={Store} />
-            <Stat label="Locations" value={listing.locationLabel} icon={MapPin} />
+      {/* Body */}
+      <div className="flex flex-col gap-3 px-4 py-3.5 sm:px-4 sm:py-4">
+        {/* Logo + identity */}
+        <div className="flex items-start gap-3">
+          <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-sm">
+            {listing.logoUrl ? (
+              <Image
+                src={listing.logoUrl}
+                alt=""
+                width={52}
+                height={52}
+                unoptimized
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <Store className="h-5 w-5 text-slate-400" />
+            )}
           </div>
 
-          {tags.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 flex-1" />
-          )}
-
-          <span className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#6D28D9] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(109,40,217,0.3)] transition-all duration-300 group-hover:bg-[#5B21B6] group-hover:shadow-[0_6px_20px_rgba(109,40,217,0.4)]">
-            View Details
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            {listing.category ? (
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6D28D9]">
+                {listing.category}
+              </p>
+            ) : null}
+            <h3 className="line-clamp-1 text-base font-bold tracking-tight text-slate-900">
+              {listing.businessName}
+            </h3>
+            {listing.tagline ? (
+              <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{listing.tagline}</p>
+            ) : (
+              <p className="mt-0.5 text-xs text-slate-400">No tagline yet</p>
+            )}
+          </div>
         </div>
-      </Link>
-    </motion.div>
+
+        {/* Metrics — compact inline row */}
+        <div className="flex items-center divide-x divide-slate-200 rounded-lg bg-slate-50/90 px-1 py-2 ring-1 ring-slate-100">
+          <Metric label="Investment" value={listing.investmentLabel} icon={Wallet} />
+          <Metric label="Model" value={listing.modelLabel} icon={Store} />
+          <Metric label="Locations" value={listing.locationLabel} icon={MapPin} />
+        </div>
+
+        {dateLabel ? (
+          <p className="text-[10px] text-slate-400">{dateLabel}</p>
+        ) : null}
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-0.5">
+          <Link
+            href={previewHref}
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#6D28D9] px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#5B21B6]"
+          >
+            View Details
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+
+          {canEdit ? (
+            <Link
+              href={editHref}
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 transition-colors hover:border-[#6D28D9]/30 hover:bg-slate-50"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Link>
+          ) : displayStatus === "submitted" ? (
+            <span className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50 px-2 text-xs font-semibold text-amber-900">
+              <Lock className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Review In Progress</span>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </motion.article>
   );
 }
 
-function Stat({
+function Metric({
   label,
   value,
   icon: Icon,
@@ -132,25 +175,12 @@ function Stat({
   icon: typeof Wallet;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-        <Icon className="h-3 w-3 shrink-0" />
+    <div className="min-w-0 flex-1 px-2 text-center">
+      <div className="flex items-center justify-center gap-0.5 text-[8px] font-semibold uppercase tracking-wider text-slate-400">
+        <Icon className="h-2.5 w-2.5 shrink-0" />
         <span className="truncate">{label}</span>
       </div>
-      <p className="mt-1 truncate text-xs font-semibold text-slate-800">{value}</p>
+      <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-800">{value}</p>
     </div>
   );
-}
-
-function buildTags(
-  brand: Brand,
-  category: string,
-  industry: string,
-): string[] {
-  const tags = new Set<string>();
-  if (category && category !== "Multi-location") tags.add(category);
-  if (industry && industry !== "Franchise") tags.add(industry);
-  brand.franchise_models.slice(0, 2).forEach((m) => tags.add(m.toUpperCase()));
-  if (brand.roi_percent != null) tags.add(`${brand.roi_percent}% ROI`);
-  return [...tags].slice(0, 4);
 }

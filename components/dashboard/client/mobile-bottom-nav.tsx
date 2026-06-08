@@ -28,11 +28,19 @@ export function MobileBottomNav({ items, onOpenDrawer }: MobileBottomNavProps) {
               <Link
                 href={item.href}
                 className={cn(
-                  "flex min-w-[4rem] flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium",
-                  active ? "font-bold text-[#6D28D9]" : "text-slate-500",
+                  "relative flex min-w-[4rem] flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-medium transition-all duration-200",
+                  active
+                    ? "font-bold text-[#6D28D9]"
+                    : "text-slate-500 hover:text-slate-700",
                 )}
               >
-                <NavIcon name={item.icon} className="h-5 w-5" />
+                {active ? (
+                  <span className="absolute inset-x-1 -top-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#6D28D9] to-[#5B21B6]" />
+                ) : null}
+                <NavIcon
+                  name={item.icon}
+                  className={cn("h-5 w-5", active && "text-[#6D28D9]")}
+                />
                 {item.mobileLabel}
               </Link>
             </li>

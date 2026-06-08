@@ -54,7 +54,16 @@ export function PremiumMarketplaceListing({
       <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_48px_rgba(15,23,42,0.08)]">
         <div className="relative h-56 sm:h-72 lg:h-96">
           {heroImage ? (
-            <Image src={heroImage} alt="" fill unoptimized className="object-cover" priority />
+            <Image
+              src={heroImage}
+              alt=""
+              fill
+              unoptimized
+              className="object-cover"
+              priority
+              fetchPriority="high"
+              sizes="(max-width: 1024px) 100vw, 1200px"
+            />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#6D28D9]/20 to-slate-100">
               <Building2 className="h-20 w-20 text-slate-300" />
@@ -198,7 +207,15 @@ export function PremiumMarketplaceListing({
                       carouselIndex === i ? "ring-[#6D28D9]" : "ring-transparent hover:ring-slate-200",
                     )}
                   >
-                    <Image src={url} alt="" fill unoptimized className="object-cover" />
+                    <Image
+                      src={url}
+                      alt=""
+                      fill
+                      unoptimized
+                      loading="lazy"
+                      sizes="(max-width: 640px) 50vw, 200px"
+                      className="object-cover"
+                    />
                   </button>
                 ))}
               </div>

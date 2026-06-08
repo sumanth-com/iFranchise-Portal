@@ -4,10 +4,20 @@ import { BrandOnboardingWizard } from "@/components/brand/BrandOnboardingWizard"
 import { getBrandAssets } from "@/lib/assets/queries";
 import { requireClient } from "@/lib/auth/session";
 import { getClientBrandById } from "@/lib/brand/queries";
+import { resolveWizardResumeStep } from "@/lib/brand/wizard-resume";
+import type { BrandAssetsBundle } from "@/types/assets";
 
 type EditBrandPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ step?: string }>;
+};
+
+const emptyAssets: BrandAssetsBundle = {
+  logo: null,
+  gallery: [],
+  storePhotos: [],
+  productPhotos: [],
+  documents: [],
 };
 
 function parseStep(value: string | undefined): number {
@@ -22,27 +32,27 @@ export default async function EditBrandPage({
 }: EditBrandPageProps) {
   const { id } = await params;
   const { step: stepParam } = await searchParams;
-  const step = parseStep(stepParam);
 
   const profile = await requireClient();
-  const { brand, error: loadError } = await getClientBrandById(profile.id, id);
+
+  const [brandResult, assetsResult] = await Promise.all([
+    getClientBrandById(profile.id, id),
+    getBrandAssets(id),
+  ]);
+
+  const { brand, error: loadError } = brandResult;
+  const assets = assetsResult.assets ?? emptyAssets;
 
   if (!brand && !loadError) {
     notFound();
   }
 
-  const assetsResult = brand
-    ? await getBrandAssets(brand.id)
-    : {
-        assets: {
-          logo: null,
-          gallery: [],
-          storePhotos: [],
-          productPhotos: [],
-          documents: [],
-        },
-        error: null,
-      };
+  const step =
+    stepParam != null && stepParam !== ""
+      ? parseStep(stepParam)
+      : brand
+        ? resolveWizardResumeStep(brand, assets)
+        : 1;
 
   return (
     <BrandOnboardingWizard
@@ -50,7 +60,7 @@ export default async function EditBrandPage({
       brand={brand}
       brandId={id}
       loadError={loadError}
-      assets={assetsResult.assets}
+      assets={assets}
       assetsError={assetsResult.error}
       initialStep={step}
       editBasePath={`/dashboard/brands/${id}/edit`}

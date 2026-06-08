@@ -15,12 +15,14 @@ import {
   ChevronRight,
   FileText,
   ImageIcon,
+  RefreshCw,
   Sparkles,
 } from "lucide-react";
 
 import { BrochureUploadedCard } from "@/components/assets/BrochureUploadedCard";
 import { DeleteAssetButton } from "@/components/assets/DeleteAssetButton";
 import { FileDropzone } from "@/components/assets/FileDropzone";
+import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/assets/UploadProgress";
 import {
   IMAGE_ACCEPT,
@@ -99,6 +101,7 @@ export function BrandAssetsStep({
 }: BrandAssetsStepProps) {
   const [, startUpload] = useTransition();
   const brochureReplaceRef = useRef<HTMLInputElement>(null);
+  const logoReplaceRef = useRef<HTMLInputElement>(null);
 
   const [logoState, logoAction, logoPending] = useActionState(
     uploadLogo,
@@ -243,6 +246,16 @@ export function BrandAssetsStep({
     startUpload(() => brochureAction(fd));
   };
 
+  const handleLogoReplaceClick = () => {
+    logoReplaceRef.current?.click();
+  };
+
+  const handleLogoReplaceSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length > 0) uploadLogoFile(files);
+  };
+
   const handleBrochureReplaceClick = () => {
     brochureReplaceRef.current?.click();
   };
@@ -342,13 +355,35 @@ export function BrandAssetsStep({
 
         {editable ? (
           <>
-            <FileDropzone
+            <input
+              ref={logoReplaceRef}
+              type="file"
               accept={IMAGE_ACCEPT}
-              disabled={logoPending}
-              label={localLogo ? "Replace logo" : "Drop your logo here"}
-              hint="Drag & drop or click to browse"
-              onFilesSelected={uploadLogoFile}
+              className="sr-only"
+              onChange={handleLogoReplaceSelected}
             />
+            {localLogo ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={logoPending}
+                  onClick={handleLogoReplaceClick}
+                >
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                  Replace logo
+                </Button>
+              </div>
+            ) : (
+              <FileDropzone
+                accept={IMAGE_ACCEPT}
+                disabled={logoPending}
+                label="Drop your logo here"
+                hint="Drag & drop or click to browse"
+                onFilesSelected={uploadLogoFile}
+              />
+            )}
             <UploadProgress active={logoPending} label="Uploading logo…" />
           </>
         ) : null}

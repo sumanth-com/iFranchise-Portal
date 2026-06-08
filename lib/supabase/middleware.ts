@@ -23,7 +23,7 @@ import type { UserRole } from "@/types/auth";
 import type { TeamRole } from "@/types/team";
 
 import { getSupabaseEnv } from "./env";
-import { fetchWithTimeout } from "./fetch";
+import { fetchWithTimeoutMiddleware } from "./fetch";
 
 type ProfileGate = {
   role: UserRole;
@@ -41,7 +41,7 @@ function createMiddlewareClient(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(url, publishableKey, {
-    global: { fetch: fetchWithTimeout },
+    global: { fetch: fetchWithTimeoutMiddleware },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -177,6 +177,7 @@ export async function updateSession(request: NextRequest) {
     const resolved = resolveUserFromGetUser(authUser, error);
 
     if (resolved.unavailable) {
+      authDebug("middleware-auth-unavailable", { pathname });
       if (isProtectedPath(pathname)) {
         return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
       }
@@ -189,11 +190,16 @@ export async function updateSession(request: NextRequest) {
       pathname,
     });
   } catch (error) {
+    authDebug("middleware-auth-error", {
+      pathname,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
     if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
       return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
     }
 
-    // Unknown failures — treat as logged out, never loop on "unavailable".
+    // Network / unknown failures — treat as logged out, never loop on "unavailable".
     if (isProtectedPath(pathname)) {
       return redirectToLogin(request, undefined, pathname);
     }

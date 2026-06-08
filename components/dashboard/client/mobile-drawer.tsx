@@ -44,7 +44,7 @@ export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-50"
+                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -53,13 +53,8 @@ export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
               {groups.map((group, groupIndex) => (
                 <div
                   key={group.label || group.items[0]?.href || `nav-group-${groupIndex}`}
-                  className="mb-4"
+                  className="space-y-0.5"
                 >
-                  {group.label ? (
-                    <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      {group.label}
-                    </p>
-                  ) : null}
                   {group.items.map((item) => {
                     const active = isNavItemActive(pathname, item.href);
                     return (
@@ -68,14 +63,24 @@ export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+                          "group relative mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                           active
-                            ? "bg-[#F5F3FF] text-[#6D28D9] ring-1 ring-[#DDD6FE]"
-                            : "text-slate-600 hover:bg-slate-50",
+                            ? "text-white shadow-[0_6px_20px_rgba(109,40,217,0.42)]"
+                            : "text-slate-600 hover:scale-[1.02] hover:bg-slate-50 hover:shadow-sm",
                         )}
                       >
-                        <NavIcon name={item.icon} className="h-4 w-4" />
-                        <span className="flex-1">{item.label}</span>
+                        {active ? (
+                          <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#6D28D9] via-[#5B21B6] to-[#4F46E5]" />
+                        ) : null}
+                        <span
+                          className={cn(
+                            "relative z-10 flex h-8 w-8 items-center justify-center rounded-lg",
+                            active ? "text-white" : "text-slate-500",
+                          )}
+                        >
+                          <NavIcon name={item.icon} active={active} />
+                        </span>
+                        <span className="relative z-10 flex-1">{item.label}</span>
                       </Link>
                     );
                   })}

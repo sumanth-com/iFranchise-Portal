@@ -92,21 +92,4 @@ export function buildMarketplaceListing(
   };
 }
 
-export function displayStatusLabel(
-  status: Brand["status"] | "preview",
-): string {
-  switch (status) {
-    case "submitted":
-      return "Under Review";
-    case "changes_requested":
-      return "Changes Requested";
-    case "draft":
-      return "Draft";
-    case "approved":
-      return "Approved";
-    case "rejected":
-      return "Rejected";
-    default:
-      return "Preview";
-  }
-}
+export { displayStatusLabel } from "@/lib/dashboard/brand-display-status";

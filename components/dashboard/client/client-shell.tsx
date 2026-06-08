@@ -9,7 +9,6 @@ import { MobileDrawer } from "@/components/dashboard/client/mobile-drawer";
 import { PageTransition } from "@/components/layout/page-transition";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { clientNav, clientNavGroups } from "@/lib/nav-config";
-import type { PortalNotification } from "@/lib/notifications/types";
 import {
   applyTheme,
   loadSettings,
@@ -22,7 +21,6 @@ type ClientShellProps = {
   userId: string;
   email: string;
   name?: string | null;
-  notifications: PortalNotification[];
 };
 
 export function ClientShell({
@@ -32,7 +30,6 @@ export function ClientShell({
   userId,
   email,
   name,
-  notifications,
 }: ClientShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -73,7 +70,6 @@ export function ClientShell({
             userId={userId}
             email={email}
             name={name}
-            notifications={notifications}
           />
           <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">

@@ -20,8 +20,8 @@ const STATUS_CONFIG: Record<
     icon: CircleDashed,
   },
   submitted: {
-    label: "Submitted",
-    className: "bg-blue-50 text-blue-800 ring-blue-100",
+    label: "Under Review",
+    className: "bg-amber-50 text-amber-900 ring-amber-200",
     icon: Send,
   },
   changes_requested: {

@@ -1,8 +1,6 @@
 "use client";
 
-import { NotificationCenter } from "@/components/dashboard/client/notification-center";
 import { ClientUserMenu } from "@/components/dashboard/client/client-user-menu";
-import type { PortalNotification } from "@/lib/notifications/types";
 
 type ClientTopbarProps = {
   title: string;
@@ -10,7 +8,6 @@ type ClientTopbarProps = {
   userId: string;
   email: string;
   name?: string | null;
-  notifications: PortalNotification[];
 };
 
 export function ClientTopbar({
@@ -19,25 +16,26 @@ export function ClientTopbar({
   userId,
   email,
   name,
-  notifications,
 }: ClientTopbarProps) {
   return (
-    <header className="z-30 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-white/80 px-4 backdrop-blur-md sm:px-6 dark:border-slate-700/80 dark:bg-slate-900/80">
-      <div className="min-w-0">
-        <h1 className="truncate text-base font-semibold text-slate-900 sm:text-lg dark:text-slate-100">
+    <header className="client-topbar z-30 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-6 border-b border-[#5B21B6]/40 bg-gradient-to-r from-[#6D28D9] via-[#5B21B6] to-[#4F46E5] px-4 shadow-[0_4px_20px_rgba(109,40,217,0.22)] sm:px-6 lg:px-8">
+      <div className="min-w-0 flex-1 pr-2">
+        <h1 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-white sm:text-base">
           {title}
         </h1>
         {subtitle ? (
-          <p className="truncate text-xs text-slate-500 sm:text-sm dark:text-slate-400">
+          <p className="mt-0.5 hidden truncate text-[13px] leading-snug text-white/80 sm:block">
             {subtitle}
           </p>
         ) : null}
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
-        <NotificationCenter userId={userId} notifications={notifications} />
-        <ClientUserMenu userId={userId} email={email} name={name} />
-      </div>
+      <ClientUserMenu
+        userId={userId}
+        email={email}
+        name={name}
+        variant="onPurple"
+      />
     </header>
   );
 }

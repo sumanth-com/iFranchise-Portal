@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Lock, Shield } from "lucide-react";
 
 import { BrandAssetsStep } from "@/components/assets/BrandAssetsStep";
 import { AuthAlert } from "@/components/auth/auth-alert";
@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { Textarea } from "@/components/ui/textarea";
 import { saveBrandDraft, submitBrandForReview, requestBrandUpdate } from "@/lib/brand/actions";
+import {
+  canOwnerEditBrand,
+  getOwnerEditBlockReason,
+} from "@/lib/brand/owner-access";
 import { displayBusinessName } from "@/lib/brand/constants";
 import {
   calculateWizardProgress,
@@ -34,7 +38,6 @@ import {
   BRAND_CREATION_STEPS,
   brandNewPath,
   FRANCHISE_MODEL_OPTIONS,
-  isBrandEditable,
   isBrandLocked,
   initialBrandActionState,
 } from "@/types/brand";
@@ -77,10 +80,11 @@ export function BrandOnboardingWizard({
   );
   const resolvedBrandId = localBrandId;
   const locked = Boolean(brand && isBrandLocked(brand.status));
+  const editBlockReason = brand ? getOwnerEditBlockReason(brand) : null;
   const editable =
     !loadError &&
     !locked &&
-    (isCreateMode || Boolean(brand && isBrandEditable(brand.status)));
+    (isCreateMode || Boolean(brand && canOwnerEditBrand(brand)));
   const [step, setStep] = useState(
     Math.min(Math.max(initialStep, 1), STEPS.length) - 1,
   );
@@ -229,7 +233,7 @@ export function BrandOnboardingWizard({
     const leavingAssetsStep = step === 1 && clamped !== 1;
     setStep(clamped);
     syncUrl(clamped + 1, resolvedBrandId);
-    if (leavingAssetsStep) {
+    if (editable && leavingAssetsStep) {
       router.refresh();
     }
     if (clamped === 7 && formRef.current) {
@@ -352,17 +356,19 @@ export function BrandOnboardingWizard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
-                Brand Creation Wizard
+                {isCreateMode ? "Brand Creation Wizard" : "Edit Listing"}
               </p>
               <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
                 {isCreateMode
                   ? "Create franchise listing"
                   : brand
-                    ? `Edit ${brand.business_name}`
+                    ? `Edit ${displayBusinessName(brand.business_name)}`
                     : "Edit brand listing"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Complete your franchise profile to publish on the marketplace.
+                {editable
+                  ? "Update your franchise profile. Changes save to this listing only."
+                  : editBlockReason ?? "View your saved listing details."}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +406,7 @@ export function BrandOnboardingWizard({
           ) : null}
         </div>
 
-        {editable ? (
+        {(editable || brand) ? (
           <div className="border-b border-slate-100 px-5 py-5 sm:px-6 sm:py-6">
             <Stepper steps={STEPS} currentStep={step} compact />
           </div>
@@ -421,6 +427,13 @@ export function BrandOnboardingWizard({
             </Button>
           </form>
         </div>
+      ) : null}
+
+      {!editable &&
+      brand &&
+      editBlockReason &&
+      brand.status !== "approved" ? (
+        <ReviewLockBanner reason={editBlockReason} submittedAt={brand.submitted_at} />
       ) : null}
 
       {brand?.admin_feedback &&
@@ -691,6 +704,31 @@ export function BrandOnboardingWizard({
               </button>
             </div>
           </div>
+        ) : brand ? (
+          <div className="fixed bottom-20 left-0 right-0 z-40 border-t border-amber-200/60 bg-amber-50/95 px-4 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md lg:bottom-0 lg:left-[var(--sidebar-width,16rem)]">
+            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => goToStep(step - 1)}
+                disabled={step === 0}
+              >
+                Previous
+              </Button>
+              <p className="flex items-center gap-1.5 text-center text-xs font-medium text-amber-900">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                Read-only · Step {step + 1} of {STEPS.length}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => goToStep(step + 1)}
+                disabled={isLastStep}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         ) : null}
       </form>
 
@@ -770,6 +808,39 @@ function CityField({ label, name, defaultValue, disabled }: { label: string; nam
       <Label htmlFor={name}>{label}</Label>
       <Input id={name} name={name} defaultValue={defaultValue ?? ""} disabled={disabled} placeholder="Mumbai, Delhi, Bangalore" />
       <p className="text-xs text-slate-500">Comma-separated city names</p>
+    </div>
+  );
+}
+
+function ReviewLockBanner({
+  reason,
+  submittedAt,
+}: {
+  reason: string;
+  submittedAt: string | null;
+}) {
+  return (
+    <div className="mt-6 overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50 via-orange-50/40 to-white shadow-sm">
+      <div className="flex items-start gap-4 px-5 py-4 sm:px-6 sm:py-5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 ring-1 ring-amber-200/80">
+          <Shield className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold tracking-tight text-amber-950">
+            Listing Under Review — Editing Locked
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-amber-900/90">{reason}</p>
+          {submittedAt ? (
+            <p className="mt-2 text-xs text-amber-800/75">
+              Submitted {formatDateTime(submittedAt)} · Your saved data and uploads remain visible below.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-amber-800/75">
+              Your saved data and uploaded files remain visible below in read-only mode.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

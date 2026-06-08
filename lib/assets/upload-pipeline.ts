@@ -3,6 +3,11 @@ import {
   isDocumentEnumError,
 } from "@/lib/assets/brochure-compat";
 import { BRAND_ASSETS_BUCKET, SIGNED_URL_EXPIRY_SECONDS } from "@/lib/assets/constants";
+import {
+  isOptimizableImageMime,
+  optimizeImageToWebp,
+  type OptimizedImage,
+} from "@/lib/assets/image-optimize";
 import { getAssetsAdminClient } from "@/lib/assets/storage-admin";
 import { logUpload, logUploadError } from "@/lib/assets/upload-log";
 import type { AssetType } from "@/types/assets";
@@ -125,9 +130,9 @@ export async function verifyStorageBucket(): Promise<
   return { ok: true, bucket: data };
 }
 
-export async function uploadToStorage(
+export async function uploadBufferToStorage(
   storagePath: string,
-  file: UploadBlob,
+  buffer: Buffer,
   contentType: string,
 ) {
   const { client, error } = requireAssetsAdmin();
@@ -139,10 +144,8 @@ export async function uploadToStorage(
     bucket: BRAND_ASSETS_BUCKET,
     path: storagePath,
     contentType,
-    sizeBytes: file.size,
+    sizeBytes: buffer.length,
   });
-
-  const buffer = Buffer.from(await file.arrayBuffer());
 
   const result = await client.storage.from(BRAND_ASSETS_BUCKET).upload(storagePath, buffer, {
     contentType,
@@ -166,6 +169,61 @@ export async function uploadToStorage(
   });
 
   return { ok: true as const, error: null, data: result.data };
+}
+
+export async function uploadToStorage(
+  storagePath: string,
+  file: UploadBlob,
+  contentType: string,
+) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return uploadBufferToStorage(storagePath, buffer, contentType);
+}
+
+/** Convert PNG/JPEG/WebP uploads to optimized WebP before storage. */
+export async function uploadOptimizedImageToStorage(
+  storagePath: string,
+  file: UploadBlob,
+  options?: { maxWidth?: number; maxHeight?: number; quality?: number },
+): Promise<
+  | { ok: true; optimized: OptimizedImage; data: NonNullable<Awaited<ReturnType<typeof uploadBufferToStorage>>["data"]> }
+  | { ok: false; error: string }
+> {
+  const mime = file.type || "application/octet-stream";
+
+  if (!isOptimizableImageMime(mime)) {
+    return { ok: false, error: "Unsupported image type for optimization." };
+  }
+
+  try {
+    const input = Buffer.from(await file.arrayBuffer());
+    const optimized = await optimizeImageToWebp(input, options);
+
+    logUpload("IMAGE_OPTIMIZE", {
+      path: storagePath,
+      originalBytes: input.length,
+      optimizedBytes: optimized.sizeBytes,
+      width: optimized.width,
+      height: optimized.height,
+      format: "webp",
+    });
+
+    const upload = await uploadBufferToStorage(
+      storagePath,
+      optimized.buffer,
+      optimized.mimeType,
+    );
+
+    if (!upload.ok) {
+      return { ok: false, error: upload.error ?? "Storage upload failed." };
+    }
+
+    return { ok: true, optimized, data: upload.data! };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Image optimization failed.";
+    logUploadError("IMAGE_OPTIMIZE", error, { path: storagePath });
+    return { ok: false, error: message };
+  }
 }
 
 export async function verifyStorageObjectExists(

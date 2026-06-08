@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 
+import { SidebarBrandFooter } from "@/components/dashboard/client/sidebar-brand-footer";
 import { NavIcon } from "@/components/layout/nav-icon";
 import { isNavItemActive } from "@/lib/nav/is-nav-active";
 import type { ClientNavGroup } from "@/lib/nav-config";
@@ -16,7 +17,11 @@ type MobileDrawerProps = {
   groups: ClientNavGroup[];
 };
 
-export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
+export function MobileDrawer({
+  open,
+  onClose,
+  groups,
+}: MobileDrawerProps) {
   const pathname = usePathname();
 
   return (
@@ -39,12 +44,13 @@ export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
             className="fixed bottom-0 left-0 top-0 z-50 flex w-[min(85vw,20rem)] flex-col border-r border-slate-200 bg-white lg:hidden"
           >
-            <div className="flex h-[var(--topbar-height)] items-center justify-between border-b border-slate-200 px-4">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200 px-4">
               <span className="text-sm font-semibold text-slate-900">Menu</span>
               <button
                 type="button"
                 onClick={onClose}
                 className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50"
+                aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -87,6 +93,7 @@ export function MobileDrawer({ open, onClose, groups }: MobileDrawerProps) {
                 </div>
               ))}
             </nav>
+            <SidebarBrandFooter collapsed={false} />
           </motion.aside>
         </>
       ) : null}

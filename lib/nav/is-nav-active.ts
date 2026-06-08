@@ -28,10 +28,6 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     );
   }
 
-  if (href === "/dashboard/messages") {
-    return path === "/dashboard/messages";
-  }
-
   if (href === "/dashboard/notifications") {
     return path === "/dashboard/notifications";
   }
@@ -42,6 +38,14 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 
   if (href === "/dashboard/support") {
     return path === "/dashboard/support";
+  }
+
+  if (href === "/dashboard/blog") {
+    return path === "/dashboard/blog" || path.startsWith("/dashboard/blog/");
+  }
+
+  if (href === "/dashboard/growth-hub") {
+    return path === "/dashboard/growth-hub";
   }
 
   return path === href || path.startsWith(`${href}/`);

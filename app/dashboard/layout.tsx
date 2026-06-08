@@ -12,8 +12,6 @@ export default async function DashboardLayout({
 
   return (
     <ClientShell
-      title="Brand Portal"
-      subtitle="Manage and grow your franchise listings"
       userId={profile.id}
       email={profile.email}
       name={profile.full_name}

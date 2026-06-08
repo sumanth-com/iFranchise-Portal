@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Mail, MessageCircle, BookOpen } from "lucide-react";
+import { redirect } from "next/navigation";
 
+import { LegacyDocRedirect } from "@/components/dashboard/client/legacy-doc-redirect";
 import { GlassCard } from "@/components/dashboard/client/glass-card";
 
 const OPTIONS = [
@@ -14,8 +16,8 @@ const OPTIONS = [
   {
     icon: BookOpen,
     title: "Documentation",
-    description: "Guides for creating listings, submitting brands, and managing approvals.",
-    href: "/dashboard/support#documentation",
+    description: "Full guide to iFranchise and the Brand Owner Portal.",
+    href: "/dashboard/documentation",
     cta: "Browse docs",
   },
   {
@@ -27,9 +29,19 @@ const OPTIONS = [
   },
 ];
 
-export default function SupportPage() {
+type SupportPageProps = {
+  searchParams: Promise<{ section?: string }>;
+};
+
+export default async function SupportPage({ searchParams }: SupportPageProps) {
+  const params = await searchParams;
+  if (params.section === "documentation") {
+    redirect("/dashboard/documentation");
+  }
+
   return (
     <div className="space-y-8">
+      <LegacyDocRedirect />
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
           Help Center
@@ -64,16 +76,6 @@ export default function SupportPage() {
           );
         })}
       </div>
-
-      <GlassCard padding="lg" id="documentation">
-        <h2 className="text-lg font-semibold text-slate-900">Quick guides</h2>
-        <ul className="mt-4 space-y-3 text-sm text-slate-600">
-          <li>• Create multiple franchise listings from My Brands</li>
-          <li>• Submit drafts for admin review when your profile is complete</li>
-          <li>• Preview listings exactly as investors will see them</li>
-          <li>• Request updates on approved listings when you need changes</li>
-        </ul>
-      </GlassCard>
     </div>
   );
 }

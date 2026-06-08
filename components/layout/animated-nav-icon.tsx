@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  BookOpen,
   Building2,
   ClipboardList,
   Eye,
@@ -12,6 +13,7 @@ import {
   Settings,
   Sparkles,
   Store,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +34,8 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   plus: Plus,
   clipboardList: ClipboardList,
   users: Users,
+  bookOpen: BookOpen,
+  trendingUp: TrendingUp,
 };
 
 /** Per-icon hover animation classes — 200ms, hover only. */
@@ -50,6 +54,10 @@ const HOVER_ANIM: Partial<Record<NavIconName, string>> = {
   bell: "nav-icon-swing transition-transform duration-200 ease-out origin-top",
   settings:
     "transition-transform duration-200 ease-out group-hover:rotate-45",
+  bookOpen:
+    "transition-transform duration-200 ease-out group-hover:-translate-y-0.5 group-hover:scale-105",
+  trendingUp:
+    "transition-transform duration-200 ease-out group-hover:-translate-y-0.5 group-hover:scale-110",
 };
 
 type AnimatedNavIconProps = {

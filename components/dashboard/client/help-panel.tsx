@@ -13,7 +13,7 @@ const LINKS = [
     description: "Talk to our franchise team",
   },
   {
-    href: "/dashboard/support#documentation",
+    href: "/dashboard/documentation",
     label: "Documentation",
     icon: BookOpen,
     description: "Guides for brand onboarding",

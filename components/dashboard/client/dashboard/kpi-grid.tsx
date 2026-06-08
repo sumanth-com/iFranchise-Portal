@@ -4,7 +4,6 @@ import {
   Bell,
   Building2,
   Clock,
-  MessageSquare,
   Store,
   TrendingUp,
   Users,
@@ -16,7 +15,6 @@ import { cn } from "@/lib/utils";
 export type DashboardKpis = {
   totalBrands: number;
   activeListings: number;
-  messages: number;
   notifications: number;
   underReview: number;
   futureLeads: number | null;
@@ -25,7 +23,6 @@ export type DashboardKpis = {
 export const EMPTY_DASHBOARD_KPIS: DashboardKpis = {
   totalBrands: 0,
   activeListings: 0,
-  messages: 0,
   notifications: 0,
   underReview: 0,
   futureLeads: null,
@@ -50,12 +47,6 @@ const KPI_CONFIG: {
     accent: "from-emerald-500 to-teal-600",
   },
   {
-    key: "messages",
-    label: "Messages",
-    icon: MessageSquare,
-    accent: "from-blue-500 to-indigo-600",
-  },
-  {
     key: "notifications",
     label: "Notifications",
     icon: Bell,
@@ -77,12 +68,22 @@ const KPI_CONFIG: {
 
 type KpiGridProps = {
   kpis?: DashboardKpis;
+  compact?: boolean;
 };
 
-export function DashboardKpiGrid({ kpis = EMPTY_DASHBOARD_KPIS }: KpiGridProps) {
+export function DashboardKpiGrid({
+  kpis = EMPTY_DASHBOARD_KPIS,
+  compact = false,
+}: KpiGridProps) {
   const safeKpis = kpis ?? EMPTY_DASHBOARD_KPIS;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <div
+      className={cn(
+        "grid sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5",
+        compact ? "gap-3" : "gap-4",
+      )}
+    >
       {KPI_CONFIG.map(({ key, label, icon: Icon, accent }) => {
         const raw = safeKpis[key];
         const value = raw === null ? "—" : raw;
@@ -91,7 +92,10 @@ export function DashboardKpiGrid({ kpis = EMPTY_DASHBOARD_KPIS }: KpiGridProps) 
         return (
           <div
             key={key}
-            className="group rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
+            className={cn(
+              "rounded-2xl border border-slate-200/90 bg-white shadow-sm",
+              compact ? "p-3" : "p-4",
+            )}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -112,7 +116,7 @@ export function DashboardKpiGrid({ kpis = EMPTY_DASHBOARD_KPIS }: KpiGridProps) 
               </div>
               <span
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm transition-transform duration-200 group-hover:scale-105",
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm",
                   accent,
                 )}
               >

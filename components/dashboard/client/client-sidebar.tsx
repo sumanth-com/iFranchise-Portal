@@ -3,10 +3,10 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeft, PanelLeftClose } from "lucide-react";
 
 import { NavIcon } from "@/components/layout/nav-icon";
-import { Logo } from "@/components/ui/logo";
+import { SidebarBrandFooter } from "@/components/dashboard/client/sidebar-brand-footer";
+import { SidebarToggleHeader } from "@/components/dashboard/client/sidebar-toggle-header";
 import { isNavItemActive } from "@/lib/nav/is-nav-active";
 import type { ClientNavGroup, NavItem } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,9 @@ type ClientSidebarProps = {
   collapsed: boolean;
   onToggle: () => void;
 };
+
+const NAV_ACTIVE_GRADIENT =
+  "absolute inset-0 rounded-xl bg-gradient-to-r from-[#6D28D9] to-[#5B21B6]";
 
 function NavLink({
   item,
@@ -32,30 +35,37 @@ function NavLink({
     <Link
       href={item.href}
       className={cn(
-        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
+        "group relative flex items-center font-semibold transition-all duration-200 ease-out",
+        collapsed
+          ? "mx-auto h-9 w-9 justify-center rounded-xl p-0"
+          : "gap-2.5 rounded-xl px-3 py-2 text-sm",
         active
-          ? "text-white shadow-[0_6px_20px_rgba(109,40,217,0.42)]"
-          : "text-slate-600 hover:scale-[1.02] hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm",
-        collapsed && "justify-center px-2.5",
+          ? "text-white shadow-sm"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
       )}
     >
       {active ? (
         <motion.span
           layoutId="client-nav-active"
-          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#6D28D9] via-[#5B21B6] to-[#4F46E5]"
+          className={NAV_ACTIVE_GRADIENT}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
         />
       ) : null}
       <span
         className={cn(
-          "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+          "relative z-10 flex shrink-0 items-center justify-center",
+          collapsed ? "h-9 w-9" : "h-4 w-4",
           active ? "text-white" : "text-slate-500 group-hover:text-[#6D28D9]",
         )}
       >
-        <NavIcon name={item.icon} active={active} />
+        <NavIcon
+          name={item.icon}
+          active={active}
+          className={collapsed ? "h-[18px] w-[18px]" : "h-4 w-4"}
+        />
       </span>
       {!collapsed ? (
-        <span className="relative z-10 flex-1 truncate">{item.label}</span>
+        <span className="relative z-10 min-w-0 flex-1 truncate">{item.label}</span>
       ) : null}
     </Link>
   );
@@ -75,37 +85,32 @@ export function ClientSidebar({
         collapsed ? "w-[var(--sidebar-collapsed)]" : "w-[var(--sidebar-width)]",
       )}
     >
-      <div
-        className={cn(
-          "flex h-[var(--topbar-height)] shrink-0 items-center border-b border-slate-200/80 px-4",
-          collapsed ? "justify-center" : "justify-between",
-        )}
-      >
-        {!collapsed ? (
-          <Logo size="sm" variant="mono" />
-        ) : (
-          <Logo size="sm" showText={false} variant="mono" />
-        )}
-        <button
-          type="button"
-          onClick={onToggle}
-          className="hidden rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 lg:block"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <PanelLeft className="h-5 w-5" />
-          ) : (
-            <PanelLeftClose className="h-5 w-5" />
-          )}
-        </button>
-      </div>
+      <SidebarToggleHeader collapsed={collapsed} onToggle={onToggle} />
 
-      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3">
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2.5 pb-4 pt-3">
         {groups.map((group, groupIndex) => (
           <div
             key={group.label || group.items[0]?.href || `nav-group-${groupIndex}`}
-            className="space-y-0.5"
+            className={cn(
+              "space-y-1.5",
+              groupIndex > 0 &&
+                (collapsed
+                  ? "mt-5 pt-1"
+                  : "mt-7 border-t border-slate-100 pt-5"),
+            )}
           >
+            {group.label ? (
+              collapsed ? (
+                <div
+                  className="mx-auto mb-2.5 h-px w-7 bg-slate-200/90"
+                  aria-hidden
+                />
+              ) : (
+                <p className="mb-2.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {group.label}
+                </p>
+              )
+            ) : null}
             {group.items.map((item) => (
               <NavLink
                 key={item.href}
@@ -117,6 +122,8 @@ export function ClientSidebar({
           </div>
         ))}
       </nav>
+
+      <SidebarBrandFooter collapsed={collapsed} />
     </aside>
   );
 }

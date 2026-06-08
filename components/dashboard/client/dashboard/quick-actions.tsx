@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import {
+  Bell,
   Eye,
   Headphones,
-  MessageSquare,
   PlusCircle,
   Store,
 } from "lucide-react";
@@ -46,10 +46,10 @@ const ACTIONS: {
     icon: Headphones,
   },
   {
-    href: "/dashboard/messages",
-    label: "View Messages",
-    description: "Admin & review updates",
-    icon: MessageSquare,
+    href: "/dashboard/notifications",
+    label: "Notifications",
+    description: "Review and listing updates",
+    icon: Bell,
   },
 ];
 

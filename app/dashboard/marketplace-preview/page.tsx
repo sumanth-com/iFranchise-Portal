@@ -15,10 +15,10 @@ export default async function MarketplacePreviewPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          Marketplace Preview
+          Live Listing
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Select a brand to preview its public franchise listing.
+          See how investors view your franchise listing on iFranchise.
         </p>
       </div>
 

@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import Image from "next/image";
 
 import { AuthAlert } from "@/components/auth/auth-alert";
+import { AvatarCropDialog } from "@/components/dashboard/client/avatar-crop-dialog";
 import { GlassCard } from "@/components/dashboard/client/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +16,11 @@ import { updateProfileAction } from "@/lib/profile/actions";
 import { initialProfileActionState } from "@/lib/profile/types";
 import {
   clearProfileAvatar,
-  cropImageToSquare,
   loadProfileExtras,
   saveProfileExtras,
   type ClientProfileExtras,
 } from "@/lib/profile/client-preferences";
+import { dispatchProfileUpdated } from "@/lib/profile/profile-events";
 
 type ProfileFormProps = {
   userId: string;
@@ -27,12 +29,14 @@ type ProfileFormProps = {
 };
 
 export function ProfileForm({ userId, email, fullName }: ProfileFormProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [extras, setExtras] = useState<ClientProfileExtras>(() =>
     loadProfileExtras(userId),
   );
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const [cropSource, setCropSource] = useState<string | null>(null);
   const [name, setName] = useState(fullName ?? "");
   const [mounted, setMounted] = useState(false);
 
@@ -47,40 +51,55 @@ export function ProfileForm({ userId, email, fullName }: ProfileFormProps) {
   }, [userId]);
 
   useEffect(() => {
-    if (state.message) toast(state.message, "success");
     if (state.error) toast(state.error, "error");
-  }, [state.message, state.error, toast]);
+  }, [state.error, toast]);
+
+  useEffect(() => {
+    if (!state.message) return;
+    const next = {
+      ...extras,
+      avatarDataUrl: previewAvatar ?? extras.avatarDataUrl,
+    };
+    persistExtras(next);
+    setPreviewAvatar(null);
+    router.refresh();
+    toast(state.message, "success");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run only on successful save
+  }, [state.message]);
 
   const displayAvatar = previewAvatar ?? extras.avatarDataUrl;
   const initials = (name || email).slice(0, 2).toUpperCase();
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast("Please select an image file.", "error");
       return;
     }
-    try {
-      const cropped = await cropImageToSquare(file);
-      setPreviewAvatar(cropped);
-    } catch {
-      toast("Could not process image.", "error");
-    }
+    setCropSource(URL.createObjectURL(file));
     e.target.value = "";
+  };
+
+  const closeCrop = () => {
+    if (cropSource?.startsWith("blob:")) URL.revokeObjectURL(cropSource);
+    setCropSource(null);
   };
 
   const persistExtras = (next: ClientProfileExtras) => {
     saveProfileExtras(userId, next);
     setExtras(next);
-    window.dispatchEvent(new CustomEvent("profile-updated"));
+    dispatchProfileUpdated({
+      fullName: name.trim(),
+      avatarDataUrl: next.avatarDataUrl,
+    });
   };
 
   const handleRemoveAvatar = () => {
     clearProfileAvatar(userId);
     setPreviewAvatar(null);
     setExtras((prev) => ({ ...prev, avatarDataUrl: null }));
-    window.dispatchEvent(new CustomEvent("profile-updated"));
+    dispatchProfileUpdated({ avatarDataUrl: null });
     toast("Profile photo removed.", "info");
   };
 
@@ -92,6 +111,19 @@ export function ProfileForm({ userId, email, fullName }: ProfileFormProps) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
+      {cropSource ? (
+        <AvatarCropDialog
+          imageSrc={cropSource}
+          onCancel={closeCrop}
+          onConfirm={(dataUrl) => {
+            const next = { ...extras, avatarDataUrl: dataUrl };
+            persistExtras(next);
+            setPreviewAvatar(null);
+            closeCrop();
+            toast("Profile photo updated.", "success");
+          }}
+        />
+      ) : null}
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-[#6D28D9]">
           Account
@@ -107,18 +139,7 @@ export function ProfileForm({ userId, email, fullName }: ProfileFormProps) {
       <GlassCard padding="lg">
         <AuthAlert error={state.error} message={null} />
 
-        <form
-          action={formAction}
-          onSubmit={() => {
-            const next = {
-              ...extras,
-              avatarDataUrl: previewAvatar ?? extras.avatarDataUrl,
-            };
-            persistExtras(next);
-            setPreviewAvatar(null);
-          }}
-          className="space-y-8"
-        >
+        <form action={formAction} className="space-y-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="relative shrink-0">
               {mounted && displayAvatar ? (
@@ -174,11 +195,6 @@ export function ProfileForm({ userId, email, fullName }: ProfileFormProps) {
                   </Button>
                 )}
               </div>
-              {previewAvatar ? (
-                <p className="text-xs text-amber-600">
-                  Preview — save to apply your new photo.
-                </p>
-              ) : null}
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
-import { BrandPortfolioCard } from "@/components/dashboard/client/brand-portfolio-card";
+import { BrandPortfolioView } from "@/components/dashboard/client/brand-portfolio-view";
 import { BrandsEmptyState } from "@/components/dashboard/client/brands-empty-state";
 import { PortalPageHeader } from "@/components/dashboard/client/portal-page-header";
 import { getDashboardContext } from "@/lib/dashboard/context";
@@ -9,7 +9,8 @@ import { getDashboardContext } from "@/lib/dashboard/context";
 export const dynamic = "force-dynamic";
 
 export default async function MyBrandsPage() {
-  const { brands, assetsByBrandId, brandsError } = await getDashboardContext();
+  const { profile, brands, assetsByBrandId, brandsError } =
+    await getDashboardContext();
 
   return (
     <div className="portal-page w-full space-y-6">
@@ -44,24 +45,11 @@ export default async function MyBrandsPage() {
       {brands.length === 0 ? (
         <BrandsEmptyState />
       ) : (
-        <div className="grid grid-cols-1 justify-items-center gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {brands.map((brand, index) => (
-            <BrandPortfolioCard
-              key={brand.id}
-              brand={brand}
-              index={index}
-              assets={
-                assetsByBrandId[brand.id] ?? {
-                  logo: null,
-                  gallery: [],
-                  storePhotos: [],
-                  productPhotos: [],
-                  documents: [],
-                }
-              }
-            />
-          ))}
-        </div>
+        <BrandPortfolioView
+          userId={profile.id}
+          brands={brands}
+          assetsByBrandId={assetsByBrandId}
+        />
       )}
     </div>
   );

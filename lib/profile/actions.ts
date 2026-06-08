@@ -12,7 +12,9 @@ export async function updateProfileAction(
   formData: FormData,
 ): Promise<ProfileActionState> {
   const profile = await requireClient();
-  const fullName = String(formData.get("fullName") ?? "").trim();
+  const fullName = String(
+    formData.get("fullName") ?? formData.get("full_name") ?? "",
+  ).trim();
 
   if (!fullName) {
     return { error: "Name is required.", message: null };
@@ -31,9 +33,7 @@ export async function updateProfileAction(
     };
   }
 
-  revalidatePath("/dashboard/profile");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard", "layout");
 
   return { error: null, message: "Profile saved successfully." };
 }

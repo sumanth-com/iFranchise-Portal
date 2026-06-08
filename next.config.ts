@@ -23,17 +23,24 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "25mb",
     },
   },
-  images: supabaseHostname
-    ? {
-        remotePatterns: [
-          {
-            protocol: "https",
-            hostname: supabaseHostname,
-            pathname: "/storage/v1/object/**",
-          },
-        ],
-      }
-    : undefined,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      ...(supabaseHostname
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: supabaseHostname,
+              pathname: "/storage/v1/object/**",
+            },
+          ]
+        : []),
+    ],
+  },
 };
 
 export default nextConfig;

@@ -1,10 +1,11 @@
 "use client";
 
+import { Activity } from "lucide-react";
+
 import { GlassCard } from "@/components/dashboard/client/glass-card";
 import { PortalEmptyState } from "@/components/dashboard/client/portal-empty-state";
 import { formatFriendlyTimestamp } from "@/lib/format-date";
 import type { DashboardActivity } from "@/lib/dashboard/activity-feed";
-import { Activity } from "lucide-react";
 
 type ActivityFeedProps = {
   activities: DashboardActivity[];
@@ -28,10 +29,7 @@ export function DashboardActivityFeed({ activities }: ActivityFeedProps) {
       ) : (
         <ul className="mt-5 divide-y divide-slate-100">
           {activities.map((item) => (
-            <li
-              key={item.id}
-              className="flex gap-3 py-3.5 first:pt-0 last:pb-0 transition-colors hover:bg-slate-50/50"
-            >
+            <li key={item.id} className="flex gap-3 py-3.5 first:pt-0 last:pb-0">
               <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#6D28D9]" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-slate-900">{item.title}</p>

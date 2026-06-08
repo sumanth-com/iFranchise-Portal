@@ -84,7 +84,7 @@ export function SubmissionTimeline({
                 className={cn(
                   "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 shadow-sm transition-colors duration-200",
                   event.status === "done" &&
-                    "border-[#6D28D9] bg-gradient-to-br from-[#6D28D9] to-[#5B21B6] text-white shadow-[0_4px_12px_rgba(109,40,217,0.35)]",
+                    "dash-on-color border-[#6D28D9] bg-gradient-to-br from-[#6D28D9] to-[#5B21B6] text-white shadow-[0_4px_12px_rgba(109,40,217,0.35)]",
                   event.status === "current" &&
                     "border-[#6D28D9] bg-[#F5F3FF] text-[#6D28D9] ring-4 ring-[#6D28D9]/15",
                   event.status === "upcoming" &&

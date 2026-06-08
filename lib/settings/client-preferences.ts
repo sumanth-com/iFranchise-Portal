@@ -18,6 +18,8 @@ export type SettingsPreferences = {
 
 const KEY = "ifranchise-settings";
 
+export const SETTINGS_UPDATED_EVENT = "ifranchise-settings-updated";
+
 export function defaultSettings(): SettingsPreferences {
   return {
     emailAlerts: true,
@@ -45,6 +47,9 @@ export function loadSettings(userId: string): SettingsPreferences {
 
 export function saveSettings(userId: string, prefs: SettingsPreferences) {
   localStorage.setItem(`${KEY}-${userId}`, JSON.stringify(prefs));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT));
+  }
 }
 
 export function applyTheme(theme: ThemeMode) {

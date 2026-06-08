@@ -39,8 +39,8 @@
   --shadow-glow: 0 0 60px rgba(109, 40, 217, 0.25);
   --shadow-focus: 0 0 0 4px rgba(109, 40, 217, 0.2);
 
-  --sidebar-width: 16rem;
-  --sidebar-collapsed: 4.5rem;
+  --sidebar-width: 13rem;
+  --sidebar-collapsed: 3.75rem;
   --topbar-height: 3.5rem;
 
   /* Brand Owner dashboard — white background, pure black text */
@@ -376,6 +376,39 @@ body {
 
 [data-dashboard="client"] .client-topbar p {
   opacity: 0.8;
+}
+
+[data-dashboard="client"] .topbar-brand-shimmer {
+  background: linear-gradient(
+    105deg,
+    #ffffff 0%,
+    #f3e8ff 35%,
+    #ffffff 55%,
+    #ddd6fe 75%,
+    #ffffff 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: topbar-brand-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes topbar-brand-shimmer {
+  0% {
+    background-position: 100% center;
+  }
+  100% {
+    background-position: -100% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-dashboard="client"] .topbar-brand-shimmer {
+    animation: none;
+    color: #ffffff !important;
+    background: none;
+  }
 }
 
 /* Dark mode — Brand Owner dashboard (Settings → Appearance) */

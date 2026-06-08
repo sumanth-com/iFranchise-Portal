@@ -16,8 +16,6 @@ import {
 
 type ClientShellProps = {
   children: ReactNode;
-  title: string;
-  subtitle?: string;
   userId: string;
   email: string;
   name?: string | null;
@@ -25,8 +23,6 @@ type ClientShellProps = {
 
 export function ClientShell({
   children,
-  title,
-  subtitle,
   userId,
   email,
   name,
@@ -64,13 +60,7 @@ export function ClientShell({
         </Suspense>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-20 lg:pb-0">
-          <ClientTopbar
-            title={title}
-            subtitle={subtitle}
-            userId={userId}
-            email={email}
-            name={name}
-          />
+          <ClientTopbar userId={userId} email={email} name={name} />
           <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
               <PageTransition>{children}</PageTransition>

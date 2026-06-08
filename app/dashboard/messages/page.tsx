@@ -1,10 +1,6 @@
-import { MessagesInbox } from "@/components/dashboard/client/messages-inbox";
-import { getDashboardContext } from "@/lib/dashboard/context";
-import { buildMessageThreads } from "@/lib/messages/build-message-threads";
+import { redirect } from "next/navigation";
 
-export default async function MessagesPage() {
-  const { profile, brands } = await getDashboardContext();
-  const threads = buildMessageThreads(brands);
-
-  return <MessagesInbox userId={profile.id} threads={threads} />;
+/** Legacy route — messages live in Notifications. */
+export default function MessagesRedirectPage() {
+  redirect("/dashboard/notifications");
 }

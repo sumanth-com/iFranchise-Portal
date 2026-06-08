@@ -15,8 +15,19 @@ export function DashboardReviewProgress({
   stages,
   statusLabel,
 }: ReviewProgressProps) {
+  const currentIndex = stages.findIndex((s) => s.status === "current");
+  const progress =
+    stages.length <= 1
+      ? 0
+      : Math.max(
+          0,
+          ((currentIndex >= 0 ? currentIndex : stages.length - 1) /
+            (stages.length - 1)) *
+            100,
+        );
+
   return (
-    <GlassCard padding="lg">
+    <GlassCard padding="lg" className="overflow-hidden">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
@@ -24,6 +35,13 @@ export function DashboardReviewProgress({
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">{statusLabel}</p>
         </div>
+      </div>
+
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#6D28D9] to-[#4F46E5] transition-[width] duration-500"
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
       <ol className="mt-6 flex flex-col gap-0 sm:flex-row sm:items-start sm:justify-between">
@@ -40,9 +58,9 @@ export function DashboardReviewProgress({
             >
               <span
                 className={cn(
-                  "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors",
+                  "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
                   stage.status === "done" &&
-                    "border-[#6D28D9] bg-[#6D28D9] text-white",
+                    "dash-on-color border-[#6D28D9] bg-[#6D28D9] text-white",
                   stage.status === "current" &&
                     "border-[#6D28D9] bg-[#F5F3FF] text-[#6D28D9]",
                   stage.status === "upcoming" &&

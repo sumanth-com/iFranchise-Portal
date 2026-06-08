@@ -4,7 +4,10 @@ import { buildPortalNotifications } from "@/lib/notifications/build-portal-notif
 
 export default async function NotificationsPage() {
   const { profile, brands } = await getDashboardContext();
-  const notifications = buildPortalNotifications(brands);
+  const notifications = buildPortalNotifications(brands, {
+    userName: profile.full_name,
+    userEmail: profile.email,
+  });
 
   return (
     <NotificationsActivity

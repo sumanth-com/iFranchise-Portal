@@ -1,25 +1,21 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
   Building2,
-  ChevronDown,
+  Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
-  FileText,
-  MapPin,
-  TrendingUp,
-  Wallet,
-  Clock,
-  Users,
-  Maximize2,
+  Pencil,
+  Search,
+  Zap,
 } from "lucide-react";
 
 import { BrandPreviewActions } from "@/components/dashboard/client/brand-preview-actions";
-import { DashboardStatusBadge } from "@/components/dashboard/client/dashboard-status-badge";
+import { isBrochureAsset } from "@/lib/assets/brochure-compat";
 import type { MarketplaceListingData } from "@/lib/dashboard/listing-data";
 import { FRANCHISE_MODEL_OPTIONS } from "@/types/brand";
 import type { Brand } from "@/types/brand";
@@ -31,6 +27,48 @@ type PremiumMarketplaceListingProps = {
   brand: Brand;
   assets: BrandAssetsBundle;
 };
+
+const SUPPORT_ITEMS = [
+  "Managed operations & performance reporting",
+  "Central marketing and brand compliance",
+  "Supply chain and vendor onboarding guidance",
+  "Ongoing field support and operational reviews",
+];
+
+const GET_STARTED_STEPS = [
+  {
+    step: "01",
+    badge: "~5 MIN",
+    title: "Apply",
+    description:
+      "Share your profile, investment range, and preferred city. Takes under 5 minutes.",
+    icon: Pencil,
+  },
+  {
+    step: "02",
+    badge: "7–14 DAYS",
+    title: "Evaluation",
+    description:
+      "Our team reviews fit, territory potential, and readiness with a quick discovery call.",
+    icon: Search,
+  },
+  {
+    step: "03",
+    badge: "2–4 WEEKS",
+    title: "Approval",
+    description:
+      "Finalize terms, sign the franchise agreement, and secure your territory.",
+    icon: CheckCircle2,
+  },
+  {
+    step: "04",
+    badge: "GO LIVE",
+    title: "Launch",
+    description:
+      "Complete training, set up your unit, and open with full launch support.",
+    icon: Zap,
+  },
+];
 
 export function PremiumMarketplaceListing({
   listing,
@@ -45,338 +83,403 @@ export function PremiumMarketplaceListing({
 
   const [carouselIndex, setCarouselIndex] = useState(0);
   const heroImage = allImages[carouselIndex] ?? allImages[0];
-
-  const cities = [...new Set([...brand.target_cities, ...brand.existing_cities])];
+  const franchiseTypeLabel = formatFranchiseTypes(brand);
+  const expansionLabel = formatExpansion(brand);
+  const spaceLabel = formatSpace(brand);
+  const paybackLabel = formatPaybackYears(brand.payback_period_months);
+  const lockInLabel = formatLockIn(brand);
+  const roiDisplay = brand.roi_percent != null ? `${brand.roi_percent}%` : listing.roiLabel.replace(/\s*ROI/i, "");
+  const brochure = assets.documents.find(isBrochureAsset);
+  const brochureUrl = brochure?.previewUrl;
 
   return (
-    <div className="space-y-8 pb-8">
-      {/* Hero */}
-      <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_48px_rgba(15,23,42,0.08)]">
-        <div className="relative h-56 sm:h-72 lg:h-96">
-          {heroImage ? (
-            <Image
-              src={heroImage}
-              alt=""
-              fill
-              unoptimized
-              className="object-cover"
-              priority
-              fetchPriority="high"
-              sizes="(max-width: 1024px) 100vw, 1200px"
-            />
+    <div className="space-y-6 pb-8">
+      {/* Header */}
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+            {listing.logoUrl ? (
+              <Image
+                src={listing.logoUrl}
+                alt=""
+                width={48}
+                height={48}
+                unoptimized
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <Building2 className="h-6 w-6 text-slate-400" />
+            )}
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            {listing.businessName}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            {brand.status === "approved" ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                Verified
+              </span>
+            ) : null}
+            <span className="rounded-full bg-[#F5F3FF] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#6D28D9] ring-1 ring-[#DDD6FE]">
+              Growing
+            </span>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+          {brochureUrl ? (
+            <a
+              href={brochureUrl}
+              download={brochure?.file_name ?? "franchise-brochure.pdf"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="dash-cta-purple inline-flex items-center gap-2 rounded-xl bg-[#6D28D9] px-5 py-2.5 text-sm font-semibold !text-white shadow-sm transition-colors hover:bg-[#5B21B6]"
+            >
+              <Download className="h-4 w-4" />
+              Download brochure
+            </a>
           ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#6D28D9]/20 to-slate-100">
-              <Building2 className="h-20 w-20 text-slate-300" />
-            </div>
+            <button
+              type="button"
+              disabled
+              title="Upload a brochure in Brand Assets to enable download"
+              className="dash-cta-purple inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#6D28D9]/45 px-5 py-2.5 text-sm font-semibold !text-white/80"
+            >
+              <Download className="h-4 w-4" />
+              Download brochure
+            </button>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-          {allImages.length > 1 ? (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  setCarouselIndex((i) => (i - 1 + allImages.length) % allImages.length)
-                }
-                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-lg hover:bg-white"
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCarouselIndex((i) => (i + 1) % allImages.length)}
-                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-lg hover:bg-white"
-                aria-label="Next image"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </>
-          ) : null}
-          <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-2xl sm:h-28 sm:w-28">
-                {listing.logoUrl ? (
-                  <Image src={listing.logoUrl} alt="" width={112} height={112} unoptimized className="h-full w-full object-cover" />
-                ) : (
-                  <Building2 className="h-12 w-12 text-slate-400" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1 text-white">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <DashboardStatusBadge status={brand.status} />
-                  <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur">
-                    {listing.industry}
-                  </span>
+          <button
+            type="button"
+            className="dash-cta-purple rounded-xl bg-[#6D28D9] px-5 py-2.5 text-sm font-semibold !text-white shadow-sm transition-colors hover:bg-[#5B21B6]"
+          >
+            Enquire now
+          </button>
+        </div>
+      </header>
+
+      {/* Franchise opportunity + gallery */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
+          <div>
+            <h2 className="text-lg font-bold uppercase tracking-wide text-slate-900 sm:text-xl">
+              {listing.businessName} Franchise Opportunity
+            </h2>
+            <p className="mt-3 text-sm font-semibold text-[#6D28D9]">Highlights</p>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <MetricCard label="Investment" value={listing.investmentLabel} />
+              <MetricCard label="Space (sq.ft)" value={spaceLabel} />
+              <MetricCard label="ROI" value={roiDisplay} />
+              <MetricCard label="Payback" value={paybackLabel} />
+              <MetricCard label="Outlets" value={listing.outletsLabel} />
+              <MetricCard label="Lock-in" value={lockInLabel} />
+            </div>
+
+            <div className="mt-5 space-y-1 text-sm text-slate-700">
+              <p>
+                <span className="font-semibold text-slate-900">Agreement term:</span>{" "}
+                {brand.agreement_term_years
+                  ? `${brand.agreement_term_years} Years`
+                  : "On request"}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-900">Model:</span>{" "}
+                {listing.modelLabel}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-900">Expansion:</span>{" "}
+                {expansionLabel}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-2xl bg-slate-100">
+            <div className="relative aspect-[4/3] w-full">
+              {heroImage ? (
+                <Image
+                  src={heroImage}
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 560px"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                  <Building2 className="h-16 w-16 text-slate-300" />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-                  {listing.businessName}
-                </h1>
-                <p className="mt-2 text-base text-white/90 sm:text-lg">{listing.tagline}</p>
-              </div>
+              )}
+
+              {allImages.length > 0 ? (
+                <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                  {carouselIndex + 1} / {allImages.length}
+                </span>
+              ) : null}
+
+              {allImages.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCarouselIndex(
+                        (i) => (i - 1 + allImages.length) % allImages.length,
+                      )
+                    }
+                    className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md hover:bg-white"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCarouselIndex((i) => (i + 1) % allImages.length)
+                    }
+                    className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md hover:bg-white"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+                    {allImages.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setCarouselIndex(i)}
+                        className={cn(
+                          "h-2 w-2 rounded-full transition-colors",
+                          i === carouselIndex ? "bg-white" : "bg-white/45",
+                        )}
+                        aria-label={`Go to image ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
-
-        {/* Quick stats bar */}
-        <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 sm:grid-cols-5">
-          <QuickStat icon={Wallet} label="Investment" value={listing.investmentLabel} />
-          <QuickStat icon={TrendingUp} label="ROI" value={listing.roiLabel} />
-          <QuickStat icon={Clock} label="Payback" value={formatPayback(brand.payback_period_months)} />
-          <QuickStat icon={MapPin} label="Locations" value={listing.locationLabel} />
-          <QuickStat icon={Building2} label="Model" value={listing.modelLabel} className="col-span-2 sm:col-span-1" />
-        </div>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="space-y-8 lg:col-span-2">
-          <Section title="About Brand" icon={Building2}>
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-900">Brand Story</h4>
-                <p className="mt-2 text-base leading-relaxed text-slate-600">
-                  {brand.description?.trim() || "Brand story coming soon."}
+      {/* About + Investment */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ContentCard title={`About ${listing.businessName}`}>
+          {listing.tagline ? (
+            <p className="text-base font-semibold text-slate-900">{listing.tagline}</p>
+          ) : null}
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            {brand.description?.trim() || listing.description}
+          </p>
+
+          <p className="mt-6 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            What this means for you
+          </p>
+          <ul className="mt-3 space-y-3 text-sm leading-relaxed text-slate-600">
+            <li>
+              <span className="font-semibold text-slate-900">
+                Established Brand Proposition:
+              </span>{" "}
+              {listing.outletsLabel} with presence across{" "}
+              {listing.locationLabel.toLowerCase()}.
+            </li>
+            <li>
+              <span className="font-semibold text-slate-900">Returns Profile:</span>{" "}
+              Indicative returns around {roiDisplay}
+              {brand.payback_period_months
+                ? ` with payback in ${paybackLabel}`
+                : ""}
+              .
+            </li>
+          </ul>
+        </ContentCard>
+
+        <ContentCard title="Investment & Financials">
+          <p className="text-xs leading-relaxed text-slate-500">
+            Indicative figures from brand disclosure. Final numbers depend on city,
+            format, and site.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <MetricCard
+              label="Franchise Fee"
+              value={formatLakhs(brand.franchise_fee)}
+              compact
+            />
+            <MetricCard label="Space (sq.ft)" value={spaceLabel} compact />
+            <MetricCard label="Returns" value={roiDisplay} compact />
+            <MetricCard label="Payback" value={paybackLabel} compact />
+            <MetricCard
+              label="Franchise Types"
+              value={franchiseTypeLabel}
+              compact
+              className="col-span-2 sm:col-span-1"
+            />
+          </div>
+        </ContentCard>
+      </div>
+
+      {/* Support + Get Started */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ContentCard title="Brand & Partner Support">
+          <ul className="space-y-2.5">
+            {SUPPORT_ITEMS.map((item) => (
+              <li
+                key={item}
+                className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+              >
+                <span className="dash-on-color mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#6D28D9]">
+                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                </span>
+                <span className="text-sm text-slate-700">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </ContentCard>
+
+        <ContentCard title="How to Get Started">
+          <p className="text-sm text-slate-500">
+            Four clear steps from first click to launch. No guesswork between
+            milestones.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {GET_STARTED_STEPS.map((step) => (
+              <div
+                key={step.step}
+                className="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="dash-on-color flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#6D28D9]">
+                    <step.icon className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {step.badge}
+                  </span>
+                </div>
+                <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Step {step.step}
+                </p>
+                <p className="mt-0.5 text-sm font-bold text-slate-900">{step.title}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                  {step.description}
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <HighlightCard title="Why Invest" text={brand.tagline ?? "Strong unit economics and proven scalability."} />
-                <HighlightCard title="USP" text={`${listing.category} · ${listing.outletsLabel}`} />
-              </div>
-            </div>
-          </Section>
-
-          <Section title="Investment Details" icon={Wallet}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DetailTile label="Investment Range" value={listing.investmentLabel} />
-              <DetailTile label="Franchise Fee" value={formatCurrency(brand.franchise_fee)} />
-              <DetailTile label="Working Capital" value="On request" />
-              <DetailTile label="ROI" value={listing.roiLabel} />
-              <DetailTile label="Payback Period" value={formatPayback(brand.payback_period_months)} />
-              <DetailTile label="Space Required" value={brand.space_required_sqft ? `${brand.space_required_sqft.toLocaleString()} sq ft` : "On request"} />
-            </div>
-          </Section>
-
-          <Section title="Franchise Model" icon={Users}>
-            <div className="flex flex-wrap gap-2">
-              {(brand.franchise_models.length ? brand.franchise_models : ["FOFO"]).map((m) => {
-                const opt = FRANCHISE_MODEL_OPTIONS.find((o) => o.value === m);
-                return (
-                  <span key={m} className="rounded-xl bg-[#F5F3FF] px-4 py-2 text-sm font-semibold text-[#6D28D9]">
-                    {opt?.label ?? m}
-                  </span>
-                );
-              })}
-            </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <DetailTile label="Area Requirements" value={brand.space_required_sqft ? `${brand.space_required_sqft} sq ft` : "Flexible"} />
-              <DetailTile label="Agreement Term" value={brand.agreement_term_years ? `${brand.agreement_term_years} years` : "—"} />
-              <DetailTile label="Operational Support" value="Training, marketing & supply chain" />
-            </div>
-          </Section>
-
-          <Section title="Locations" icon={MapPin}>
-            <p className="mb-4 text-sm text-slate-600">{listing.locationLabel}</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {(cities.length ? cities : ["Pan-India"]).map((city) => (
-                <motion.div
-                  key={city}
-                  whileHover={{ y: -2 }}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800"
-                >
-                  <MapPin className="mb-1 h-4 w-4 text-[#6D28D9]" />
-                  {city}
-                </motion.div>
-              ))}
-            </div>
-            {brand.expansion_tier_1.length > 0 ? (
-              <p className="mt-4 text-sm text-slate-500">
-                Tier 1 expansion: {brand.expansion_tier_1.join(", ")}
-              </p>
-            ) : null}
-          </Section>
-
-          {allImages.length > 0 ? (
-            <Section title="Gallery" icon={Maximize2}>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {allImages.map((url, i) => (
-                  <button
-                    key={url}
-                    type="button"
-                    onClick={() => setCarouselIndex(i)}
-                    className={cn(
-                      "relative aspect-[4/3] overflow-hidden rounded-xl ring-2 ring-offset-2 transition-all",
-                      carouselIndex === i ? "ring-[#6D28D9]" : "ring-transparent hover:ring-slate-200",
-                    )}
-                  >
-                    <Image
-                      src={url}
-                      alt=""
-                      fill
-                      unoptimized
-                      loading="lazy"
-                      sizes="(max-width: 640px) 50vw, 200px"
-                      className="object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            </Section>
-          ) : null}
-
-          {assets.documents.length > 0 ? (
-            <Section title="Downloads" icon={Download}>
-              <ul className="space-y-2">
-                {assets.documents.map((doc) => (
-                  <li key={doc.id}>
-                    <a
-                      href={doc.previewUrl ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-[#6D28D9] hover:text-[#6D28D9]"
-                    >
-                      <FileText className="h-5 w-5 shrink-0" />
-                      {doc.file_name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          ) : null}
-
-          <Section title="FAQ" icon={ChevronDown}>
-            <FaqAccordion items={buildFaq(listing, brand)} />
-          </Section>
-        </div>
-
-        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-          <BrandPreviewActions brand={brand} />
-        </div>
+            ))}
+          </div>
+        </ContentCard>
       </div>
+
+      <BrandPreviewActions brand={brand} />
     </div>
   );
 }
 
-function Section({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  icon: typeof Wallet;
-  children: ReactNode;
-}) {
+function ContentCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8"
-    >
-      <div className="mb-5 flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F5F3FF] text-[#6D28D9]">
-          <Icon className="h-4 w-4" />
-        </span>
-        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      </div>
-      {children}
-    </motion.section>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }
 
-function QuickStat({
-  icon: Icon,
+function MetricCard({
   label,
   value,
+  compact = false,
   className,
 }: {
-  icon: typeof Wallet;
   label: string;
   value: string;
+  compact?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("px-4 py-4 sm:px-5 sm:py-5", className)}>
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        <Icon className="h-3.5 w-3.5" />
+    <div
+      className={cn(
+        "rounded-xl border border-slate-200 bg-white",
+        compact ? "px-3 py-3" : "px-3 py-3.5",
+        className,
+      )}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         {label}
-      </div>
-      <p className="mt-1 truncate text-sm font-bold text-slate-900 sm:text-base">{value}</p>
+      </p>
+      <p
+        className={cn(
+          "mt-1 font-bold text-slate-900",
+          compact ? "text-sm" : "text-base",
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
-function DetailTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-1 text-base font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function HighlightCard({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-[#DDD6FE] bg-[#F5F3FF]/50 p-4">
-      <p className="text-sm font-semibold text-[#6D28D9]">{title}</p>
-      <p className="mt-1 text-sm text-slate-700">{text}</p>
-    </div>
-  );
-}
-
-function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
-  const [open, setOpen] = useState<number | null>(0);
-  return (
-    <div className="divide-y divide-slate-100 rounded-xl border border-slate-100">
-      {items.map((item, i) => (
-        <div key={item.q}>
-          <button
-            type="button"
-            onClick={() => setOpen(open === i ? null : i)}
-            className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left text-sm font-semibold text-slate-900 hover:bg-slate-50"
-          >
-            {item.q}
-            <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", open === i && "rotate-180")} />
-          </button>
-          <AnimatePresence>
-            {open === i ? (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <p className="px-4 pb-4 text-sm leading-relaxed text-slate-600">{item.a}</p>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function buildFaq(listing: MarketplaceListingData, brand: Brand) {
-  return [
-    { q: "What is the minimum investment?", a: listing.investmentLabel },
-    { q: "What franchise models are available?", a: listing.modelLabel },
-    { q: "What is the expected ROI?", a: listing.roiLabel },
-    { q: "Where is the brand expanding?", a: listing.locationLabel },
-    {
-      q: "What support does the franchisor provide?",
-      a: "Training, marketing support, supply chain assistance, and ongoing operational guidance.",
-    },
-    {
-      q: "How many outlets exist today?",
-      a: brand.current_outlets != null ? `${brand.current_outlets}+ outlets` : listing.outletsLabel,
-    },
-  ];
-}
-
-function formatCurrency(value: number | null): string {
+function formatLakhs(value: number | null): string {
   if (value == null) return "On request";
+  const lakhs = value / 100000;
+  if (lakhs >= 1) {
+    const rounded = lakhs % 1 === 0 ? lakhs.toFixed(0) : lakhs.toFixed(1);
+    return `₹${rounded} Lakhs`;
+  }
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
-function formatPayback(months: number | null): string {
+function formatSpace(brand: Brand): string {
+  if (brand.space_required_sqft) {
+    return brand.space_required_sqft.toLocaleString("en-IN");
+  }
+  return "As per brand format";
+}
+
+function formatPaybackYears(months: number | null): string {
   if (months == null) return "On request";
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return years === 1 ? "1 year" : `${years} years`;
+  }
   return `${months} months`;
+}
+
+function formatLockIn(brand: Brand): string {
+  if (brand.lock_in_period_months != null) {
+    if (brand.lock_in_period_months % 12 === 0) {
+      const years = brand.lock_in_period_months / 12;
+      return years === 1 ? "1 Year" : `${years} Years`;
+    }
+    return `${brand.lock_in_period_months} months`;
+  }
+  if (brand.agreement_term_years) {
+    return `${brand.agreement_term_years} Years`;
+  }
+  return "On request";
+}
+
+function formatFranchiseTypes(brand: Brand): string {
+  if (!brand.franchise_models.length) return "Unit Franchise";
+  return brand.franchise_models
+    .map((m) => FRANCHISE_MODEL_OPTIONS.find((o) => o.value === m)?.label ?? m)
+    .join(" · ");
+}
+
+function formatExpansion(brand: Brand): string {
+  const parts = [
+    ...brand.expansion_tier_1,
+    ...brand.expansion_metro,
+    ...brand.target_cities,
+  ].filter(Boolean);
+  if (parts.length > 0) {
+    return parts.slice(0, 3).join(", ");
+  }
+  if (brand.expansion_tier_2.length > 0) {
+    return brand.expansion_tier_2.slice(0, 3).join(", ");
+  }
+  return listingFallbackExpansion(brand);
+}
+
+function listingFallbackExpansion(brand: Brand): string {
+  const cities = [...brand.existing_cities, ...brand.target_cities];
+  if (cities.length > 0) return cities.slice(0, 3).join(", ");
+  return "Pan-India expansion";
 }

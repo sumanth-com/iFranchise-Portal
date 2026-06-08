@@ -6,7 +6,6 @@ import { getDashboardContext } from "@/lib/dashboard/context";
 import { buildDashboardActivity } from "@/lib/dashboard/activity-feed";
 import { buildPortfolioTimeline } from "@/lib/dashboard/portfolio-timeline";
 import { getPortfolioReviewStage } from "@/lib/dashboard/review-stage";
-import { buildMessageThreads } from "@/lib/messages/build-message-threads";
 import { buildPortalNotifications } from "@/lib/notifications/build-portal-notifications";
 
 export default async function DashboardPage() {
@@ -20,8 +19,10 @@ export default async function DashboardPage() {
     brand,
   } = await getDashboardContext();
 
-  const notifications = buildPortalNotifications(brands);
-  const messageThreads = buildMessageThreads(brands);
+  const notifications = buildPortalNotifications(brands, {
+    userName: profile.full_name,
+    userEmail: profile.email,
+  });
   const activities = buildDashboardActivity(brands, assetsByBrandId);
   const timeline = buildPortfolioTimeline(brands, assetsByBrandId);
   const { label: reviewLabel, stages: reviewStages } =
@@ -33,7 +34,6 @@ export default async function DashboardPage() {
   const kpis: DashboardKpis = {
     totalBrands: portfolioStats.total,
     activeListings: portfolioStats.approved + portfolioStats.underReview,
-    messages: messageThreads.filter((t) => t.id !== "support-welcome").length,
     notifications: notifications.length,
     underReview: portfolioStats.underReview,
     futureLeads: null,
@@ -41,12 +41,13 @@ export default async function DashboardPage() {
 
   return (
     <PortalDashboardHome
+      userId={profile.id}
+      email={profile.email}
       name={profile.full_name}
       kpis={kpis}
       reviewLabel={reviewLabel}
       reviewStages={reviewStages}
       activities={activities}
-      notifications={notifications}
       health={portfolioHealth}
       brandName={brand?.business_name}
       timeline={timeline}

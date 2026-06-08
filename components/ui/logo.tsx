@@ -1,16 +1,22 @@
+import Image from "next/image";
+
 import { cn } from "@/lib/utils";
+
+const LOGO_SRC = "/assets/Logo.webp";
 
 type LogoProps = {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
   className?: string;
   variant?: "brand" | "mono";
+  /** Collapsed sidebar — logo only, no purple background */
+  markVariant?: "plain" | "nav";
 };
 
 const sizes = {
-  sm: { mark: "h-9 w-9 text-sm", text: "text-base" },
-  md: { mark: "h-11 w-11 text-base", text: "text-lg" },
-  lg: { mark: "h-16 w-16 text-xl", text: "text-2xl" },
+  sm: { mark: "h-8 w-8", px: 32, text: "text-sm leading-tight", sub: "text-[10px]" },
+  md: { mark: "h-10 w-10", px: 40, text: "text-base", sub: "text-xs" },
+  lg: { mark: "h-14 w-14", px: 56, text: "text-xl", sub: "text-sm" },
 };
 
 export function Logo({
@@ -18,28 +24,55 @@ export function Logo({
   showText = true,
   className,
   variant = "brand",
+  markVariant = "plain",
 }: LogoProps) {
   const s = sizes[size];
   const mono = variant === "mono";
+  const navMark = markVariant === "nav";
 
-  return (
-    <div className={cn("flex items-center gap-3", className)}>
+  if (navMark && !showText) {
+    return (
       <div
         className={cn(
-          "flex items-center justify-center rounded-2xl font-bold shadow-[var(--shadow-sm)]",
-          mono
-            ? "border border-black bg-white text-black"
-            : "bg-gradient-to-br from-[#6D28D9] to-[#A78BFA] text-white",
+          "relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-sm",
+          className,
+        )}
+        aria-label="iFranchise"
+      >
+        <Image
+          src={LOGO_SRC}
+          alt=""
+          width={36}
+          height={36}
+          className="h-full w-full object-contain"
+          priority
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
+      <div
+        className={cn(
+          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-sm",
           s.mark,
         )}
       >
-        iF
+        <Image
+          src={LOGO_SRC}
+          alt="iFranchise"
+          width={s.px}
+          height={s.px}
+          className="h-full w-full object-contain"
+          priority={size === "lg"}
+        />
       </div>
       {showText ? (
-        <div className="flex flex-col leading-tight">
+        <div className="min-w-0 flex flex-col leading-tight">
           <span
             className={cn(
-              "font-semibold tracking-tight",
+              "truncate font-semibold tracking-tight",
               mono ? "text-black" : "text-foreground",
               s.text,
             )}
@@ -48,8 +81,9 @@ export function Logo({
           </span>
           <span
             className={cn(
-              "text-xs font-medium",
-              mono ? "text-black" : "text-primary-600",
+              "font-medium",
+              mono ? "text-slate-600" : "text-primary-600",
+              s.sub,
             )}
           >
             Portal

@@ -12,7 +12,9 @@ export type NavIconName =
   | "building2"
   | "plus"
   | "clipboardList"
-  | "users";
+  | "users"
+  | "bookOpen"
+  | "trendingUp";
 
 export type NavItem = {
   href: string;
@@ -53,14 +55,9 @@ export const clientNavGroups: ClientNavGroup[] = [
       },
       {
         href: "/dashboard/marketplace-preview",
-        label: "Marketplace Preview",
+        label: "Live Listing",
         icon: "eye",
-      },
-      {
-        href: "/dashboard/messages",
-        label: "Messages",
-        icon: "messageSquare",
-        mobileLabel: "Messages",
+        mobileLabel: "Listing",
       },
       {
         href: "/dashboard/notifications",
@@ -72,6 +69,23 @@ export const clientNavGroups: ClientNavGroup[] = [
         href: "/dashboard/settings",
         label: "Settings",
         icon: "settings",
+      },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [
+      {
+        href: "/dashboard/blog",
+        label: "Blog",
+        icon: "bookOpen",
+        mobileLabel: "Blog",
+      },
+      {
+        href: "/dashboard/growth-hub",
+        label: "Growth Hub",
+        icon: "trendingUp",
+        mobileLabel: "Growth",
       },
     ],
   },

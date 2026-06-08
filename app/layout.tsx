@@ -13,6 +13,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "iFranchise Portal",
   description: "Premium franchise onboarding for business owners and reviewers",
+  icons: {
+    icon: "/assets/favicon.ico",
+    shortcut: "/assets/favicon.ico",
+    apple: "/assets/favicon.ico",
+  },
 };
 
 export default function RootLayout({

@@ -22,17 +22,21 @@ import { formatDate, formatRelativeTime } from "@/lib/format-date";
 import { brandEditPath } from "@/types/brand";
 import type { Brand } from "@/types/brand";
 import type { BrandAssetsBundle } from "@/types/assets";
+import type { BrandDefaultView } from "@/lib/settings/client-preferences";
+import { cn } from "@/lib/utils";
 
 type BrandPortfolioCardProps = {
   brand: Brand;
   assets: BrandAssetsBundle;
   index?: number;
+  layout?: BrandDefaultView;
 };
 
 export function BrandPortfolioCard({
   brand,
   assets,
   index = 0,
+  layout = "grid",
 }: BrandPortfolioCardProps) {
   const listing = buildMarketplaceListing(brand, assets);
   const previewHref = `/dashboard/brands/${brand.id}/preview`;
@@ -57,15 +61,28 @@ export function BrandPortfolioCard({
     .filter(Boolean)
     .join(" · ");
 
+  const isList = layout === "list";
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
-      className="group mx-auto flex w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-shadow duration-300 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)]"
+      className={cn(
+        "group flex w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-shadow duration-300 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)]",
+        isList
+          ? "max-w-none flex-row"
+          : "mx-auto max-w-[440px] flex-col",
+      )}
     >
-      {/* Cover — 3:2 ratio shows the full banner without heavy cropping */}
-      <div className="relative aspect-[3/2] shrink-0 overflow-hidden bg-slate-50">
+      <div
+        className={cn(
+          "relative shrink-0 overflow-hidden bg-slate-50",
+          isList
+            ? "min-h-[148px] w-36 self-stretch sm:w-44"
+            : "aspect-[3/2] w-full",
+        )}
+      >
         {bannerImage ? (
           <Image
             src={bannerImage}
@@ -88,8 +105,12 @@ export function BrandPortfolioCard({
         </div>
       </div>
 
-      {/* Body */}
-      <div className="flex flex-col gap-3 px-4 py-3.5 sm:px-4 sm:py-4">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col gap-3 px-4 py-3.5 sm:px-4 sm:py-4",
+          isList && "justify-center",
+        )}
+      >
         {/* Logo + identity */}
         <div className="flex items-start gap-3">
           <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-sm">

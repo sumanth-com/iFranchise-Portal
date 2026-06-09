@@ -14,6 +14,7 @@ import {
   isServiceUnavailableError,
   resolveUserFromGetUser,
 } from "@/lib/auth/resolve-auth";
+import { isStaffRole, isSuperAdminProfile } from "@/lib/auth/staff";
 import { canManageTeam } from "@/lib/team/permissions";
 import type { Profile, UserRole } from "@/types/auth";
 import type { TeamRole } from "@/types/team";
@@ -154,9 +155,10 @@ export async function requireClient() {
   return profile;
 }
 
-export async function requireAdmin() {
+/** Any staff member (admin or super_admin). */
+export async function requireStaff() {
   const profile = await requireProfile();
-  if (profile.role !== "admin") {
+  if (!isStaffRole(profile.role)) {
     redirect(PROTECTED_PATHS.client);
   }
   if (isDisabledStaffProfile(profile)) {
@@ -165,10 +167,23 @@ export async function requireAdmin() {
   return profile;
 }
 
+/** @deprecated Alias — use requireStaff */
+export async function requireAdmin() {
+  return requireStaff();
+}
+
+export async function requireSuperAdmin() {
+  const profile = await requireStaff();
+  if (!isSuperAdminProfile(profile)) {
+    redirect("/admin/access-denied");
+  }
+  return profile;
+}
+
 export async function requireTeamAccess() {
-  const profile = await requireAdmin();
-  if (!canManageTeam(profile.team_role as TeamRole | null)) {
-    redirect(PROTECTED_PATHS.admin);
+  const profile = await requireStaff();
+  if (!canManageTeam(profile.team_role as TeamRole | null, profile.role)) {
+    redirect("/admin/access-denied");
   }
   return profile;
 }
@@ -176,13 +191,9 @@ export async function requireTeamAccess() {
 export { getRedirectPathForRole };
 
 export function isAdminRole(role: UserRole): boolean {
-  return role === "admin";
+  return isStaffRole(role);
 }
 
 export function isStaffProfile(profile: Profile): boolean {
-  return (
-    profile.role === "admin" &&
-    profile.is_active &&
-    profile.team_role != null
-  );
+  return isStaffRole(profile.role) && profile.is_active;
 }

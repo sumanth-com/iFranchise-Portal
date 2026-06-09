@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 
-import { AppShell } from "@/components/layout/app-shell";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { requireAdmin } from "@/lib/auth/session";
-import { adminNav } from "@/lib/nav-config";
+import { getAdminBrands, getAdminDashboardStats } from "@/lib/admin/queries";
+import { buildAdminNotifications } from "@/lib/notifications/build-admin-notifications";
+import { isSuperAdminProfile } from "@/lib/auth/staff";
 import { canManageTeam } from "@/lib/team/permissions";
+import { adminNavGroups } from "@/lib/nav-config";
 import type { TeamRole } from "@/types/team";
 
 export default async function AdminLayout({
@@ -13,21 +16,41 @@ export default async function AdminLayout({
 }) {
   const profile = await requireAdmin();
   const teamRole = profile.team_role as TeamRole | null;
-  const navItems = adminNav.filter(
-    (item) =>
-      item.href !== "/admin/team" || canManageTeam(teamRole),
-  );
+
+  const [{ stats }, { brands }] = await Promise.all([
+    getAdminDashboardStats(),
+    getAdminBrands({ status: "submitted" }),
+  ]);
+
+  const notifications = buildAdminNotifications({
+    brands,
+    brandOwnerCount: stats.totalBrandOwners,
+  });
+
+  const navGroups = adminNavGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.href === "/admin/admin-management") {
+        return isSuperAdminProfile(profile);
+      }
+      if (item.href === "/admin/team") {
+        return canManageTeam(teamRole, profile.role);
+      }
+      return true;
+    }),
+  }));
 
   return (
-    <AppShell
-      navItems={navItems}
-      title="Review"
-      subtitle="Brand submission queue"
+    <AdminShell
+      userId={profile.id}
       email={profile.email}
       name={profile.full_name}
-      role="admin"
+      navGroups={navGroups}
+      notificationCount={notifications.filter((n) =>
+        ["new_submission", "resubmission"].includes(n.category),
+      ).length}
     >
       {children}
-    </AppShell>
+    </AdminShell>
   );
 }

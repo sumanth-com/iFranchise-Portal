@@ -9,8 +9,19 @@ export const PROTECTED_PATHS = {
   admin: "/admin",
 } as const;
 
-export function getRedirectPathForRole(role: "client" | "admin"): string {
-  return role === "admin" ? PROTECTED_PATHS.admin : PROTECTED_PATHS.client;
+export const SUPER_ADMIN_ONLY_PATHS = {
+  adminManagement: "/admin/admin-management",
+} as const;
+
+export function getRedirectPathForRole(role: "client" | "admin" | "super_admin"): string {
+  return role === "client" ? PROTECTED_PATHS.client : PROTECTED_PATHS.admin;
+}
+
+export function isSuperAdminOnlyPath(pathname: string): boolean {
+  return (
+    pathname === SUPER_ADMIN_ONLY_PATHS.adminManagement ||
+    pathname.startsWith(`${SUPER_ADMIN_ONLY_PATHS.adminManagement}/`)
+  );
 }
 
 export function isAuthPath(pathname: string): boolean {

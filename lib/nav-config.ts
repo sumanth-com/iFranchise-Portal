@@ -14,7 +14,8 @@ export type NavIconName =
   | "clipboardList"
   | "users"
   | "bookOpen"
-  | "trendingUp";
+  | "trendingUp"
+  | "shield";
 
 export type NavItem = {
   href: string;
@@ -66,6 +67,12 @@ export const clientNavGroups: ClientNavGroup[] = [
         mobileLabel: "Alerts",
       },
       {
+        href: "/dashboard/leads",
+        label: "Leads",
+        icon: "messageSquare",
+        mobileLabel: "Leads",
+      },
+      {
         href: "/dashboard/settings",
         label: "Settings",
         icon: "settings",
@@ -93,23 +100,54 @@ export const clientNavGroups: ClientNavGroup[] = [
 
 export const clientNav: NavItem[] = clientNavGroups.flatMap((g) => g.items);
 
-export const adminNav: NavItem[] = [
+export const adminNavGroups: ClientNavGroup[] = [
   {
-    href: "/admin",
-    label: "Overview",
-    icon: "layoutDashboard",
-    mobileLabel: "Home",
-  },
-  {
-    href: "/admin#queue",
-    label: "Submissions",
-    icon: "clipboardList",
-    mobileLabel: "Queue",
-  },
-  {
-    href: "/admin/team",
-    label: "Team",
-    icon: "users",
-    mobileLabel: "Team",
+    label: "",
+    items: [
+      {
+        href: "/admin",
+        label: "Dashboard",
+        icon: "layoutDashboard",
+        mobileLabel: "Home",
+      },
+      {
+        href: "/admin/reviews",
+        label: "Review Queue",
+        icon: "clipboardList",
+        mobileLabel: "Queue",
+      },
+      {
+        href: "/admin/brands",
+        label: "All Brands",
+        icon: "building2",
+        mobileLabel: "Brands",
+      },
+      {
+        href: "/admin/notifications",
+        label: "Notifications",
+        icon: "bell",
+        mobileLabel: "Alerts",
+      },
+      {
+        href: "/admin/leads",
+        label: "Leads",
+        icon: "messageSquare",
+        mobileLabel: "Leads",
+      },
+      {
+        href: "/admin/admin-management",
+        label: "Admin Management",
+        icon: "shield",
+        mobileLabel: "Admins",
+      },
+      {
+        href: "/admin/team",
+        label: "Team",
+        icon: "users",
+        mobileLabel: "Team",
+      },
+    ],
   },
 ];
+
+export const adminNav: NavItem[] = adminNavGroups.flatMap((g) => g.items);

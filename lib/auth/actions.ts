@@ -7,6 +7,7 @@ import {
   getRedirectPathForRole,
   isSafeRedirectPath,
 } from "@/lib/auth/paths";
+import { matchesStaffLogin } from "@/lib/auth/staff";
 import {
   AUTH_ERROR_CODES,
   getAuthErrorMessage,
@@ -71,7 +72,7 @@ async function getOrigin(): Promise<string> {
 }
 
 function resolveRedirectPath(
-  role: "client" | "admin",
+  role: "client" | "admin" | "super_admin",
   redirectTo: string | null,
 ): string {
   if (isSafeRedirectPath(redirectTo)) {
@@ -152,7 +153,7 @@ export async function login(
       };
     }
 
-    if (profile.role !== expectedRole) {
+    if (!matchesStaffLogin(profile, expectedRole)) {
       await supabase.auth.signOut();
       authDebug("login-role-mismatch", {
         userId: data.user.id,

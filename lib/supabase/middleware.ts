@@ -11,8 +11,10 @@ import {
   getRedirectPathForRole,
   isAuthPath,
   isProtectedPath,
+  isSuperAdminOnlyPath,
   PROTECTED_PATHS,
 } from "@/lib/auth/paths";
+import { isStaffRole } from "@/lib/auth/staff";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
 import { authDebug, isDisabledStaffGate } from "@/lib/auth/profile";
 import {
@@ -284,16 +286,27 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Role-based route protection
-  if (pathname.startsWith(PROTECTED_PATHS.admin) && role !== "admin") {
+  if (pathname.startsWith(PROTECTED_PATHS.admin) && !isStaffRole(role)) {
     return redirectToApp(request, PROTECTED_PATHS.client);
   }
 
   if (
     (pathname === PROTECTED_PATHS.client ||
       pathname.startsWith(`${PROTECTED_PATHS.client}/`)) &&
-    role === "admin"
+    isStaffRole(role)
   ) {
     return redirectToApp(request, PROTECTED_PATHS.admin);
+  }
+
+  const isSuperAdmin =
+    role === "super_admin" ||
+    (role === "admin" && profile?.team_role === "super_admin");
+
+  if (isSuperAdminOnlyPath(pathname) && !isSuperAdmin) {
+    const denied = request.nextUrl.clone();
+    denied.pathname = "/admin/access-denied";
+    denied.search = "";
+    return NextResponse.redirect(denied);
   }
 
   return getResponse();

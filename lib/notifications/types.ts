@@ -9,6 +9,11 @@ export type NotificationCategory =
   | "admin_comment"
   | "system_update";
 
+export type AdminNotificationCategory =
+  | "new_submission"
+  | "resubmission"
+  | "owner_activity";
+
 export type PortalNotification = {
   id: string;
   category: NotificationCategory;
@@ -19,14 +24,33 @@ export type PortalNotification = {
   brandName?: string;
 };
 
+export type AdminNotification = {
+  id: string;
+  category: AdminNotificationCategory;
+  title: string;
+  description: string;
+  time: string | null;
+  href: string;
+  brandName?: string;
+};
+
 export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
   brand_submitted: "Brand Submitted",
-  review_started: "Review Started",
-  brand_approved: "Review Approved",
-  brand_rejected: "Review Rejected",
+  review_started: "Under Review",
+  brand_approved: "Approved",
+  brand_rejected: "Rejected",
   edit_window_expired: "Edit Window Expired",
   document_missing: "Documents Requested",
-  marketplace_published: "Marketplace Published",
-  admin_comment: "Admin Comment",
+  marketplace_published: "Published",
+  admin_comment: "Changes Requested",
   system_update: "System Update",
+};
+
+export const ADMIN_NOTIFICATION_CATEGORY_LABELS: Record<
+  AdminNotificationCategory,
+  string
+> = {
+  new_submission: "New Submission",
+  resubmission: "Resubmission",
+  owner_activity: "Brand Owner Activity",
 };

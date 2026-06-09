@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+import { AdminBrandAssets } from "@/components/admin/admin-brand-assets";
+import { AdminBrandStatusBadge } from "@/components/admin/admin-brand-status-badge";
+import { PublishActions } from "@/components/admin/PublishActions";
 import { ReviewActions } from "@/components/admin/ReviewActions";
-import { BrandStatusBadge } from "@/components/brand/BrandStatusBadge";
 import { Card } from "@/components/ui/card";
+import { getBrandAssets } from "@/lib/assets/queries";
 import { requireAdmin } from "@/lib/auth/session";
 import { getAdminBrandById } from "@/lib/admin/queries";
 import { formatDateTime } from "@/lib/format-date";
@@ -33,7 +36,10 @@ function DetailField({
 export default async function BrandReviewPage({ params }: BrandReviewPageProps) {
   await requireAdmin();
   const { id } = await params;
-  const { brand, error } = await getAdminBrandById(id);
+  const [{ brand, error }, { assets, error: assetsError }] = await Promise.all([
+    getAdminBrandById(id),
+    getBrandAssets(id),
+  ]);
 
   if (error) {
     return (
@@ -42,7 +48,7 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
           {error}
         </p>
         <Link
-          href="/admin"
+          href="/admin/reviews"
           className="mt-4 inline-flex text-sm font-medium text-primary-600"
         >
           Back to queue
@@ -58,37 +64,34 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
   return (
     <div className="space-y-6">
       <Link
-        href="/admin"
+        href="/admin/reviews"
         className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to queue
+        Back to review queue
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
             {brand.business_name}
-          </h2>
+          </h1>
           <p className="mt-2 text-sm text-slate-500">
             {brand.owner_name ? `${brand.owner_name} · ` : ""}
             {brand.owner_email}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <BrandStatusBadge status={brand.status} pulse={brand.status === "submitted"} />
-          {brand.publish_ready ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-              Publish ready
-            </span>
-          ) : null}
-        </div>
+        <AdminBrandStatusBadge brand={brand} pulse={brand.status === "submitted"} />
       </div>
 
       <div className="grid gap-8 xl:grid-cols-5">
         <div className="space-y-6 xl:col-span-3">
+          <AdminBrandAssets assets={assets} assetsError={assetsError} />
+
           <Card padding="lg">
-            <h3 className="text-base font-semibold text-foreground">Brand dossier</h3>
+            <h3 className="text-base font-semibold text-foreground">
+              Brand information
+            </h3>
             <dl className="mt-4">
               <DetailField label="Business name" value={brand.business_name} />
               <DetailField label="Tagline" value={brand.tagline} />
@@ -96,13 +99,23 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
               <DetailField label="Category" value={brand.category} />
               <DetailField label="Description" value={brand.description} />
               <DetailField label="Website" value={brand.website_url} />
+            </dl>
+          </Card>
+
+          <Card padding="lg">
+            <h3 className="text-base font-semibold text-foreground">
+              Contact information
+            </h3>
+            <dl className="mt-4">
               <DetailField label="Contact email" value={brand.contact_email} />
               <DetailField label="Contact phone" value={brand.contact_phone} />
             </dl>
           </Card>
 
           <Card padding="lg">
-            <h3 className="text-base font-semibold text-foreground">Investment & franchise</h3>
+            <h3 className="text-base font-semibold text-foreground">
+              Investment details
+            </h3>
             <dl className="mt-4">
               <DetailField
                 label="Investment range"
@@ -136,6 +149,14 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
                     : null
                 }
               />
+            </dl>
+          </Card>
+
+          <Card padding="lg">
+            <h3 className="text-base font-semibold text-foreground">
+              Business & franchise details
+            </h3>
+            <dl className="mt-4">
               <DetailField
                 label="Franchise models"
                 value={brand.franchise_models?.join(", ")}
@@ -144,20 +165,6 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
                 label="Current outlets"
                 value={brand.current_outlets?.toString()}
               />
-              <DetailField
-                label="Existing cities"
-                value={brand.existing_cities?.join(", ")}
-              />
-            </dl>
-          </Card>
-
-          <Card padding="lg">
-            <h3 className="text-base font-semibold text-foreground">Expansion & agreement</h3>
-            <dl className="mt-4">
-              <DetailField label="Target cities" value={brand.target_cities?.join(", ")} />
-              <DetailField label="Tier 1" value={brand.expansion_tier_1?.join(", ")} />
-              <DetailField label="Tier 2" value={brand.expansion_tier_2?.join(", ")} />
-              <DetailField label="Metro" value={brand.expansion_metro?.join(", ")} />
               <DetailField
                 label="Agreement term"
                 value={
@@ -178,6 +185,23 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
           </Card>
 
           <Card padding="lg">
+            <h3 className="text-base font-semibold text-foreground">Locations</h3>
+            <dl className="mt-4">
+              <DetailField
+                label="Existing cities"
+                value={brand.existing_cities?.join(", ")}
+              />
+              <DetailField
+                label="Target cities"
+                value={brand.target_cities?.join(", ")}
+              />
+              <DetailField label="Tier 1" value={brand.expansion_tier_1?.join(", ")} />
+              <DetailField label="Tier 2" value={brand.expansion_tier_2?.join(", ")} />
+              <DetailField label="Metro" value={brand.expansion_metro?.join(", ")} />
+            </dl>
+          </Card>
+
+          <Card padding="lg">
             <h3 className="text-base font-semibold text-foreground">Timeline</h3>
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-4">
@@ -191,6 +215,10 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
               <div className="flex justify-between gap-4">
                 <span className="text-slate-500">Reviewed</span>
                 <span>{formatDateTime(brand.reviewed_at) ?? "—"}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Published</span>
+                <span>{formatDateTime(brand.published_at) ?? "—"}</span>
               </div>
             </dl>
           </Card>
@@ -207,8 +235,9 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
           ) : null}
         </div>
 
-        <div className="xl:col-span-2">
+        <div className="space-y-6 xl:col-span-2">
           <ReviewActions brand={brand} />
+          <PublishActions brand={brand} />
         </div>
       </div>
     </div>

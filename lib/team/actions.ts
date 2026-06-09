@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { getProfile } from "@/lib/auth/session";
+import { isSuperAdminProfile } from "@/lib/auth/staff";
 import { logActivity } from "@/lib/team/activity";
 import {
   canAssignRole,
@@ -27,14 +28,14 @@ function revalidateTeam() {
 
 async function requireTeamManager() {
   const profile = await getProfile();
-  if (!profile || profile.role !== "admin") {
+  if (!profile || profile.role === "client" || !isSuperAdminProfile(profile)) {
     return { error: "Access denied.", actor: null, teamRole: null };
   }
 
   const staff = await getStaffProfile(profile.id);
-  const teamRole = staff?.team_role as TeamRole | null;
+  const teamRole = (staff?.team_role ?? "super_admin") as TeamRole;
 
-  if (!teamRole || !staff?.is_active || !canManageTeam(teamRole)) {
+  if (!staff?.is_active || !canManageTeam(teamRole, profile.role)) {
     return {
       error: "You do not have permission to manage the team.",
       actor: null,

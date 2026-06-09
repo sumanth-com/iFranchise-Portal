@@ -96,13 +96,13 @@ export function buildPortalNotifications(
         brandName: brandLabel,
       });
 
-      if (brand.publish_ready) {
+      if (brand.published_at) {
         items.push({
           id: `${brand.id}-published`,
           category: "marketplace_published",
           title: "You're live on the marketplace!",
           description: `Congratulations, ${name}! "${brandLabel}" is now live on the iFranchise marketplace. Investors can discover and enquire about your franchise opportunity.`,
-          time: brand.published_at ?? brand.reviewed_at ?? brand.updated_at,
+          time: brand.published_at,
           href: previewHref,
           brandName: brandLabel,
         });

@@ -1,3 +1,5 @@
+import { isSuperAdminProfile } from "@/lib/auth/staff";
+import type { Profile, UserRole } from "@/types/auth";
 import type { TeamRole } from "@/types/team";
 
 export type Permission =
@@ -55,8 +57,16 @@ export function hasPermission(
   return ROLE_PERMISSIONS[teamRole].includes(permission);
 }
 
-export function canManageTeam(teamRole: TeamRole | null | undefined): boolean {
-  return hasPermission(teamRole, "team.view");
+export function canManageTeam(
+  teamRole: TeamRole | null | undefined,
+  portalRole?: UserRole,
+): boolean {
+  if (portalRole === "super_admin") return true;
+  return false;
+}
+
+export function canManageAdmins(profile: Profile): boolean {
+  return isSuperAdminProfile(profile);
 }
 
 export function canInviteTeam(teamRole: TeamRole | null | undefined): boolean {
@@ -97,7 +107,7 @@ export function getAssignableRoles(actorRole: TeamRole): TeamRole[] {
     ];
   }
   if (actorRole === "admin") {
-    return ["admin", "reviewer", "content_manager", "support"];
+    return ["reviewer", "content_manager", "support"];
   }
   return [];
 }

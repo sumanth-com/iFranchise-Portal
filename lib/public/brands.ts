@@ -1,17 +1,19 @@
 import { BRAND_ASSETS_BUCKET } from "@/lib/assets/constants";
 import { createServiceClient } from "@/lib/supabase/service";
+import { brandSlugFromName } from "@/lib/utils/slug";
 import type {
   PublicBrandDetail,
   PublicBrandImage,
   PublicBrandSummary,
 } from "@/types/api/public-brand";
 import type { AssetType } from "@/types/assets";
+import type { MarketplaceFilters } from "@/types/marketplace";
 
 /** Longer-lived URLs for public website consumption (24 hours). */
 const PUBLIC_SIGNED_URL_EXPIRY_SECONDS = 60 * 60 * 24;
 
 const APPROVED_BRAND_FIELDS =
-  "id, business_name, tagline, description, industry, website_url, contact_email, contact_phone, reviewed_at, updated_at";
+  "id, business_name, tagline, description, industry, website_url, contact_email, contact_phone, reviewed_at, updated_at, published_at, slug, investment_min, investment_max, target_cities, existing_cities, franchise_fee, roi_percent";
 
 type ApprovedBrandRow = {
   id: string;
@@ -24,7 +26,18 @@ type ApprovedBrandRow = {
   contact_phone: string | null;
   reviewed_at: string | null;
   updated_at: string;
+  published_at: string | null;
+  slug?: string | null;
+  investment_min?: number | null;
+  investment_max?: number | null;
+  target_cities?: string[];
+  existing_cities?: string[];
+  franchise_fee?: number | null;
+  roi_percent?: number | null;
 };
+
+const CORE_PUBLISHED_FIELDS =
+  "id, business_name, tagline, description, industry, website_url, contact_email, contact_phone, reviewed_at, updated_at, published_at";
 
 type AssetRow = {
   id: string;
@@ -95,6 +108,10 @@ function splitAssets(assets: AssetRow[], urlById: Map<string, string>) {
   };
 }
 
+function resolveSlug(brand: ApprovedBrandRow): string {
+  return brand.slug?.trim() || brandSlugFromName(brand.business_name, brand.id);
+}
+
 function toSummary(
   brand: ApprovedBrandRow,
   assets: AssetRow[],
@@ -104,13 +121,17 @@ function toSummary(
 
   return {
     id: brand.id,
+    slug: resolveSlug(brand),
     businessName: brand.business_name,
     tagline: brand.tagline,
     industry: brand.industry,
     logo,
     gallery,
-    publishedAt: brand.reviewed_at,
+    publishedAt: brand.published_at ?? brand.reviewed_at,
     updatedAt: brand.updated_at,
+    investmentMin: brand.investment_min ?? null,
+    investmentMax: brand.investment_max ?? null,
+    targetCities: brand.target_cities ?? [],
   };
 }
 
@@ -127,7 +148,34 @@ function toDetail(
       phone: brand.contact_phone,
       websiteUrl: brand.website_url,
     },
+    existingCities: brand.existing_cities ?? [],
+    franchiseFee: brand.franchise_fee ?? null,
+    roiPercent: brand.roi_percent ?? null,
   };
+}
+
+async function selectPublishedBrands(
+  supabase: NonNullable<ReturnType<typeof createServiceClient>>,
+  selectFields: string,
+) {
+  const { data, error } = await supabase
+    .from("brands")
+    .select(selectFields)
+    .eq("status", "approved")
+    .not("published_at", "is", null)
+    .order("published_at", { ascending: false, nullsFirst: false });
+
+  if (error?.message?.includes("Could not find")) {
+    const fallback = await supabase
+      .from("brands")
+      .select(CORE_PUBLISHED_FIELDS)
+      .eq("status", "approved")
+      .not("published_at", "is", null)
+      .order("published_at", { ascending: false, nullsFirst: false });
+    return fallback;
+  }
+
+  return { data, error };
 }
 
 async function fetchAssetsForBrands(
@@ -162,11 +210,10 @@ export async function getPublishedBrands(): Promise<
   }
 
   try {
-    const { data: brands, error: brandsError } = await supabase
-      .from("brands")
-      .select(APPROVED_BRAND_FIELDS)
-      .eq("status", "approved")
-      .order("reviewed_at", { ascending: false, nullsFirst: false });
+    const { data: brands, error: brandsError } = await selectPublishedBrands(
+      supabase,
+      APPROVED_BRAND_FIELDS,
+    );
 
     if (brandsError) {
       throw brandsError;
@@ -194,6 +241,162 @@ export async function getPublishedBrands(): Promise<
   }
 }
 
+export async function getMarketplaceBrands(
+  filters: MarketplaceFilters = {},
+): Promise<
+  PublicBrandsQueryResult<{
+    brands: PublicBrandSummary[];
+    total: number;
+    industries: string[];
+    cities: string[];
+    page: number;
+    pageSize: number;
+  }>
+> {
+  const supabase = getClient();
+  if (!supabase) {
+    return { data: null, error: "SERVICE_UNAVAILABLE" };
+  }
+
+  try {
+    const { data: brands, error: brandsError } = await selectPublishedBrands(
+      supabase,
+      APPROVED_BRAND_FIELDS,
+    );
+
+    if (brandsError) throw brandsError;
+
+    let rows = (brands ?? []) as ApprovedBrandRow[];
+
+    const q = filters.q?.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (b) =>
+          b.business_name.toLowerCase().includes(q) ||
+          b.tagline?.toLowerCase().includes(q) ||
+          b.description?.toLowerCase().includes(q) ||
+          b.industry?.toLowerCase().includes(q),
+      );
+    }
+
+    if (filters.industry) {
+      rows = rows.filter(
+        (b) => b.industry?.toLowerCase() === filters.industry!.toLowerCase(),
+      );
+    }
+
+    if (filters.city) {
+      const city = filters.city.toLowerCase();
+      rows = rows.filter((b) =>
+        [...(b.target_cities ?? []), ...(b.existing_cities ?? [])].some(
+          (c) => c.toLowerCase() === city,
+        ),
+      );
+    }
+
+    if (filters.investmentMin != null) {
+      rows = rows.filter(
+        (b) =>
+          b.investment_max == null || b.investment_max >= filters.investmentMin!,
+      );
+    }
+
+    if (filters.investmentMax != null) {
+      rows = rows.filter(
+        (b) =>
+          b.investment_min == null || b.investment_min <= filters.investmentMax!,
+      );
+    }
+
+    const industries = [
+      ...new Set(rows.map((b) => b.industry).filter(Boolean) as string[]),
+    ].sort();
+
+    const cities = [
+      ...new Set(
+        rows.flatMap((b) => [
+          ...(b.target_cities ?? []),
+          ...(b.existing_cities ?? []),
+        ]),
+      ),
+    ].sort();
+
+    const page = Math.max(1, filters.page ?? 1);
+    const pageSize = filters.pageSize ?? 12;
+    const total = rows.length;
+    const paged = rows.slice((page - 1) * pageSize, page * pageSize);
+
+    const brandIds = paged.map((b) => b.id);
+    const assets = await fetchAssetsForBrands(supabase, brandIds);
+    const urlById = await signAssetUrls(supabase, assets);
+
+    const assetsByBrand = new Map<string, AssetRow[]>();
+    for (const asset of assets) {
+      const list = assetsByBrand.get(asset.brand_id) ?? [];
+      list.push(asset);
+      assetsByBrand.set(asset.brand_id, list);
+    }
+
+    const summaries = paged.map((brand) =>
+      toSummary(brand, assetsByBrand.get(brand.id) ?? [], urlById),
+    );
+
+    return {
+      data: {
+        brands: summaries,
+        total,
+        industries,
+        cities,
+        page,
+        pageSize,
+      },
+      error: null,
+    };
+  } catch {
+    return { data: null, error: "INTERNAL_ERROR" };
+  }
+}
+
+export async function getPublishedBrandBySlug(
+  slug: string,
+): Promise<PublicBrandsQueryResult<PublicBrandDetail | null>> {
+  const supabase = getClient();
+  if (!supabase) {
+    return { data: null, error: "SERVICE_UNAVAILABLE" };
+  }
+
+  try {
+    const { data: brands, error } = await selectPublishedBrands(
+      supabase,
+      APPROVED_BRAND_FIELDS,
+    );
+
+    if (error) throw error;
+
+    const rows = (brands ?? []) as ApprovedBrandRow[];
+    const match = rows.find(
+      (b) =>
+        b.slug === slug ||
+        resolveSlug(b) === slug ||
+        b.id === slug,
+    );
+
+    if (!match) {
+      return { data: null, error: null };
+    }
+
+    const assets = await fetchAssetsForBrands(supabase, [match.id]);
+    const urlById = await signAssetUrls(supabase, assets);
+
+    return {
+      data: toDetail(match, assets, urlById),
+      error: null,
+    };
+  } catch {
+    return { data: null, error: "INTERNAL_ERROR" };
+  }
+}
+
 export async function getPublishedBrandById(
   brandId: string,
 ): Promise<PublicBrandsQueryResult<PublicBrandDetail | null>> {
@@ -203,12 +406,25 @@ export async function getPublishedBrandById(
   }
 
   try {
-    const { data: brand, error: brandError } = await supabase
+    let brandQuery = await supabase
       .from("brands")
       .select(APPROVED_BRAND_FIELDS)
       .eq("id", brandId)
       .eq("status", "approved")
+      .not("published_at", "is", null)
       .maybeSingle();
+
+    if (brandQuery.error?.message?.includes("Could not find")) {
+      brandQuery = await supabase
+        .from("brands")
+        .select(CORE_PUBLISHED_FIELDS)
+        .eq("id", brandId)
+        .eq("status", "approved")
+        .not("published_at", "is", null)
+        .maybeSingle();
+    }
+
+    const { data: brand, error: brandError } = brandQuery;
 
     if (brandError) {
       throw brandError;

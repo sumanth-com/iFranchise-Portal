@@ -57,12 +57,12 @@ export function buildDashboardActivity(
       });
     }
 
-    if (brand.status === "approved" && brand.publish_ready) {
+    if (brand.published_at) {
       items.push({
         id: `${brand.id}-published`,
-        title: "Marketplace Published",
+        title: "Brand Published",
         description: `"${brand.business_name}" is live on the marketplace.`,
-        timestamp: brand.published_at ?? brand.reviewed_at ?? brand.updated_at,
+        timestamp: brand.published_at,
       });
     }
 

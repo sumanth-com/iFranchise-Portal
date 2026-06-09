@@ -32,6 +32,10 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     return path === "/dashboard/notifications";
   }
 
+  if (href === "/dashboard/leads") {
+    return path === "/dashboard/leads";
+  }
+
   if (href === "/dashboard/settings") {
     return path === "/dashboard/settings";
   }

@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:apply": "tsx scripts/apply-production-db.ts",
     "db:prove": "tsx scripts/prove-rls-and-e2e.ts",
-    "db:verify": "tsx scripts/verify-production-db.ts"
+    "db:verify": "tsx scripts/verify-production-db.ts",
+    "db:apply-workflow": "tsx scripts/apply-workflow-migrations.ts",
+    "workflow:validate": "tsx scripts/validate-workflow-e2e.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

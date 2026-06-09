@@ -29,7 +29,7 @@ export function getPortfolioReviewStage(brands: Brand[]): {
   }
 
   const hasPublished = brands.some(
-    (b) => b.status === "approved" && b.publish_ready,
+    (b) => b.status === "approved" && Boolean(b.published_at),
   );
   const hasApproved = brands.some((b) => b.status === "approved");
   const inReview = brands.some(

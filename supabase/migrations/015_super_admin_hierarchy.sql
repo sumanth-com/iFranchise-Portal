@@ -1,0 +1,11 @@
+-- =============================================================================
+-- DEPRECATED — do not run this file as a single script.
+-- =============================================================================
+-- PostgreSQL error: "unsafe use of new value super_admin of enum type user_role"
+-- occurs when ADD VALUE and usage happen in the same transaction.
+--
+-- Use instead (three separate SQL Editor runs):
+--   1. 015a_user_role_add_super_admin.sql
+--   2. 015b_super_admin_hierarchy.sql
+--   3. BOOTSTRAP_SUPER_ADMIN.sql
+-- =============================================================================

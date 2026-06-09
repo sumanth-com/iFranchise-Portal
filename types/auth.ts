@@ -1,6 +1,6 @@
 import type { TeamRole } from "@/types/team";
 
-export type UserRole = "client" | "admin";
+export type UserRole = "client" | "admin" | "super_admin";
 
 export type Profile = {
   id: string;

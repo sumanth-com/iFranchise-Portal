@@ -43,12 +43,12 @@ export function ReviewActions({ brand }: ReviewActionsProps) {
     approveState.message ?? rejectState.message ?? changesState.message;
 
   return (
-    <Card className="sticky top-20 lg:top-24" padding="lg">
-      <h2 className="text-lg font-semibold text-foreground">Decision</h2>
+    <Card className="sticky top-20 lg:top-24" padding="lg" id="review-actions">
+      <h2 className="text-lg font-semibold text-foreground">Review decision</h2>
       <p className="mt-1 text-sm text-slate-500">
         {canReview
-          ? "Approve, reject, or request changes with optional feedback."
-          : "Actions are available when status is submitted."}
+          ? "Approve, request changes, or reject. Approval does not publish to the website."
+          : "Review actions are available when status is pending review."}
       </p>
 
       <div className="mt-4" aria-live="polite">
@@ -68,7 +68,7 @@ export function ReviewActions({ brand }: ReviewActionsProps) {
             rows={5}
             defaultValue={brand.admin_feedback ?? ""}
             disabled={!canReview || isPending}
-            placeholder="Notes for the client (required for reject / request changes)"
+            placeholder="Notes for the brand owner (required for reject / request changes)"
           />
         </div>
 
@@ -79,6 +79,7 @@ export function ReviewActions({ brand }: ReviewActionsProps) {
               formAction={approveAction}
               disabled={isPending}
               className="w-full"
+              id="approve"
             >
               {isApproving ? "Approving..." : "Approve brand"}
             </Button>
@@ -88,6 +89,7 @@ export function ReviewActions({ brand }: ReviewActionsProps) {
               formAction={requestChangesAction}
               disabled={isPending}
               className="w-full"
+              id="changes"
             >
               {isRequestingChanges ? "Sending..." : "Request changes"}
             </Button>
@@ -97,6 +99,7 @@ export function ReviewActions({ brand }: ReviewActionsProps) {
               formAction={rejectAction}
               disabled={isPending}
               className="w-full"
+              id="reject"
             >
               {isRejecting ? "Rejecting..." : "Reject"}
             </Button>

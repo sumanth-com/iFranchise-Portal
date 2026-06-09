@@ -47,7 +47,7 @@ type StaffGate = {
  * Legacy admins with role=admin and team_role=null remain valid.
  */
 export function isDisabledStaffGate(gate: StaffGate): boolean {
-  if (gate.role !== "admin" || gate.team_role == null) {
+  if (gate.role !== "admin" && gate.role !== "super_admin") {
     return false;
   }
   return !gate.is_active;

@@ -16,6 +16,7 @@ export type PublicBrandContact = {
 
 export type PublicBrandSummary = {
   id: string;
+  slug: string;
   businessName: string;
   tagline: string | null;
   industry: string | null;
@@ -23,11 +24,17 @@ export type PublicBrandSummary = {
   gallery: PublicBrandImage[];
   publishedAt: string | null;
   updatedAt: string;
+  investmentMin?: number | null;
+  investmentMax?: number | null;
+  targetCities?: string[];
 };
 
 export type PublicBrandDetail = PublicBrandSummary & {
   description: string | null;
   contact: PublicBrandContact;
+  existingCities?: string[];
+  franchiseFee?: number | null;
+  roiPercent?: number | null;
 };
 
 export type PublicBrandsListResponse = {

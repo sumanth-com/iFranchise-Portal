@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Plus,
   Settings,
+  Shield,
   Sparkles,
   Store,
   TrendingUp,
@@ -36,6 +37,7 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   users: Users,
   bookOpen: BookOpen,
   trendingUp: TrendingUp,
+  shield: Shield,
 };
 
 /** Per-icon hover animation classes — 200ms, hover only. */

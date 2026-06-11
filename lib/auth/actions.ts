@@ -7,7 +7,6 @@ import {
   getRedirectPathForRole,
   isSafeRedirectPath,
 } from "@/lib/auth/paths";
-import { matchesStaffLogin } from "@/lib/auth/staff";
 import {
   AUTH_ERROR_CODES,
   getAuthErrorMessage,
@@ -18,7 +17,7 @@ import {
   profileLoadErrorMessage,
   unavailableAuthState,
 } from "@/lib/auth/humanize-error";
-import { authDebug } from "@/lib/auth/profile";
+import { authDebug, authProfileTrace } from "@/lib/auth/profile";
 import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { verifySupabaseConnectivity } from "@/lib/supabase/connectivity";
 import { getSupabaseEnvStatus } from "@/lib/supabase/env";
@@ -75,25 +74,17 @@ function resolveRedirectPath(
   role: "client" | "admin" | "super_admin",
   redirectTo: string | null,
 ): string {
-  if (isSafeRedirectPath(redirectTo)) {
-    return redirectTo;
-  }
-  return getRedirectPathForRole(role);
-}
+  const destination = isSafeRedirectPath(redirectTo)
+    ? redirectTo
+    : getRedirectPathForRole(role);
 
-function parseExpectedRole(formData: FormData): "client" | "admin" | null {
-  const raw = String(formData.get("expectedRole") ?? "").trim();
-  if (raw === "client" || raw === "admin") {
-    return raw;
-  }
-  return null;
-}
+  authProfileTrace("resolveRedirectPath", {
+    role,
+    redirectTo,
+    destination,
+  });
 
-function roleMismatchMessage(expected: "client" | "admin"): string {
-  if (expected === "admin") {
-    return "This account does not have admin access. Sign in as Brand Owner instead.";
-  }
-  return "This account is not a brand owner. Sign in as Admin instead.";
+  return destination;
 }
 
 export async function login(
@@ -103,14 +94,9 @@ export async function login(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "").trim() || null;
-  const expectedRole = parseExpectedRole(formData);
 
   if (!email || !password) {
     return { error: "Email and password are required.", message: null };
-  }
-
-  if (!expectedRole) {
-    return { error: "Please select Brand Owner or Admin.", message: null };
   }
 
   const preflight = await preflightAuth();
@@ -141,26 +127,21 @@ export async function login(
       return { error: "Authentication failed. Please try again.", message: null };
     }
 
-    authDebug("login-auth-ok", { userId: data.user.id, expectedRole });
+    authDebug("login-auth-ok", { userId: data.user.id });
 
     const profile = await ensureProfileForUser(data.user, supabase);
     if (!profile) {
       await supabase.auth.signOut();
+      authProfileTrace(
+        "login:profile-missing-after-auth",
+        { userId: data.user.id, email: data.user.email ?? null },
+        "error",
+      );
       authDebug("login-profile-missing", { userId: data.user.id });
       return {
         error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
         message: null,
       };
-    }
-
-    if (!matchesStaffLogin(profile, expectedRole)) {
-      await supabase.auth.signOut();
-      authDebug("login-role-mismatch", {
-        userId: data.user.id,
-        expectedRole,
-        actualRole: profile.role,
-      });
-      return { error: roleMismatchMessage(expectedRole), message: null };
     }
 
     const destination = resolveRedirectPath(profile.role, redirectTo);
@@ -191,14 +172,6 @@ export async function signup(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const expectedRole = parseExpectedRole(formData);
-
-  if (expectedRole === "admin") {
-    return {
-      error: "Admin accounts are provisioned by the iFranchise team.",
-      message: null,
-    };
-  }
 
   if (!fullName || !email || !password) {
     return {
@@ -377,4 +350,77 @@ export async function logout() {
     await supabase.auth.signOut();
   }
   redirect("/login");
+}
+
+export type CallbackExchangeResult =
+  | { ok: true; redirectTo: string }
+  | { ok: false; error: string };
+
+/**
+ * Exchange a PKCE auth code using server cookies (password reset / OAuth).
+ * Browser clients cannot read the code verifier stored during server actions.
+ */
+export async function exchangeCallbackCode(
+  code: string,
+  next: string | null,
+): Promise<CallbackExchangeResult> {
+  const trimmed = code.trim();
+  if (!trimmed) {
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
+
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+  }
+
+  try {
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+
+    const { error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(trimmed);
+
+    if (exchangeError) {
+      authDebug("callback-code-exchange-failed", {
+        message: exchangeError.message,
+        code: exchangeError.code,
+      });
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    const profile = await ensureProfileForUser(user, supabase);
+    if (!profile) {
+      return { ok: false, error: AUTH_ERROR_CODES.profile };
+    }
+
+    const redirectTo = resolveRedirectPath(profile.role, next);
+    authDebug("callback-code-exchange-ok", {
+      userId: user.id,
+      profileId: profile.id,
+      role: profile.role,
+      redirectTo,
+    });
+
+    return { ok: true, redirectTo };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+    authDebug("callback-code-exchange-exception", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
 }

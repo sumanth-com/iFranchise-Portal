@@ -16,6 +16,7 @@ export type AdminAccount = {
 export type AdminInvitation = {
   id: string;
   email: string;
+  team_role: string;
   status: string;
   expires_at: string;
   created_at: string;
@@ -51,8 +52,8 @@ export async function getAdminInvitations(): Promise<{
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("team_invitations")
-    .select("id, email, status, expires_at, created_at")
-    .eq("team_role", "admin")
+    .select("id, email, team_role, status, expires_at, created_at")
+    .in("team_role", ["reviewer", "admin", "super_admin"])
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 

@@ -136,9 +136,9 @@ export const adminNavGroups: ClientNavGroup[] = [
       },
       {
         href: "/admin/admin-management",
-        label: "Admin Management",
+        label: "Command Center",
         icon: "shield",
-        mobileLabel: "Admins",
+        mobileLabel: "Command",
       },
       {
         href: "/admin/team",

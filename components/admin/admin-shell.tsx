@@ -53,7 +53,7 @@ export function AdminShell({
             notificationCount={notificationCount}
           />
           <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+            <div className="w-full px-3 py-5 sm:px-4 sm:py-6 lg:px-5">
               <PageTransition>{children}</PageTransition>
             </div>
           </main>

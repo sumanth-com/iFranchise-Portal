@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
-import { authDebug, PROFILE_CORE_FIELDS } from "@/lib/auth/profile";
+import { authDebug, authProfileTrace, PROFILE_CORE_FIELDS } from "@/lib/auth/profile";
 import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { createClientOptional } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -52,6 +52,18 @@ async function createProfileViaService(
     .single();
 
   if (error || !data) {
+    authProfileTrace(
+      "ensureProfileForUser:service-upsert-failed",
+      {
+        userId: user.id,
+        table: "public.profiles",
+        message: error?.message ?? "no data",
+        code: error?.code ?? null,
+        details: error?.details ?? null,
+        hint: error?.hint ?? null,
+      },
+      "error",
+    );
     authDebug("ensure-profile-service-failed", {
       userId: user.id,
       error: error?.message ?? "no data",
@@ -74,6 +86,17 @@ async function createProfileViaRpc(
   const { data, error } = await supabase.rpc("ensure_own_profile");
 
   if (error || !data) {
+    authProfileTrace(
+      "ensureProfileForUser:rpc-failed",
+      {
+        rpc: "ensure_own_profile",
+        message: error?.message ?? "no data",
+        code: error?.code ?? null,
+        details: error?.details ?? null,
+        hint: error?.hint ?? null,
+      },
+      "error",
+    );
     authDebug("ensure-profile-rpc-failed", {
       error: error?.message ?? "no data",
       code: error?.code,
@@ -98,8 +121,18 @@ export async function ensureProfileForUser(
   user: EnsureProfileUser,
   supabaseClient?: SupabaseClient,
 ): Promise<Profile | null> {
+  authProfileTrace("ensureProfileForUser:start", {
+    userId: user.id,
+    email: user.email ?? null,
+  });
+
   const supabase = supabaseClient ?? (await createClientOptional());
   if (!supabase) {
+    authProfileTrace(
+      "ensureProfileForUser:no-client",
+      { userId: user.id },
+      "error",
+    );
     authDebug("ensure-profile-no-client", { userId: user.id });
     return null;
   }
@@ -107,9 +140,18 @@ export async function ensureProfileForUser(
   try {
     const existing = await fetchProfileByUserId(supabase, user.id);
     if (existing.profile) {
+      authProfileTrace("ensureProfileForUser:existing", {
+        userId: user.id,
+        profileId: existing.profile.id,
+        role: existing.profile.role,
+      });
       return existing.profile;
     }
 
+    authProfileTrace("ensureProfileForUser:repair-needed", {
+      userId: user.id,
+      fetchError: existing.error,
+    });
     authDebug("ensure-profile-repair", {
       userId: user.id,
       reason: existing.error,
@@ -118,6 +160,14 @@ export async function ensureProfileForUser(
     if (isServiceUnavailableError(error)) {
       throw error;
     }
+    authProfileTrace(
+      "ensureProfileForUser:fetch-exception",
+      {
+        userId: user.id,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      "error",
+    );
     authDebug("ensure-profile-load-exception", {
       userId: user.id,
       error: error instanceof Error ? error.message : String(error),
@@ -126,8 +176,28 @@ export async function ensureProfileForUser(
 
   const viaService = await createProfileViaService(user);
   if (viaService) {
+    authProfileTrace("ensureProfileForUser:created-via-service", {
+      userId: user.id,
+      profileId: viaService.id,
+      role: viaService.role,
+    });
     return viaService;
   }
 
-  return createProfileViaRpc(supabase);
+  const viaRpc = await createProfileViaRpc(supabase);
+  if (viaRpc) {
+    authProfileTrace("ensureProfileForUser:created-via-rpc", {
+      userId: user.id,
+      profileId: viaRpc.id,
+      role: viaRpc.role,
+    });
+    return viaRpc;
+  }
+
+  authProfileTrace(
+    "ensureProfileForUser:failed-all-paths",
+    { userId: user.id },
+    "error",
+  );
+  return null;
 }

@@ -27,6 +27,7 @@ function parseFeedback(formData: FormData): string | null {
 
 function revalidateAdminBrand(brandId: string, userId?: string) {
   revalidatePath("/admin");
+  revalidatePath("/admin/admin-management");
   revalidatePath("/admin/brands");
   revalidatePath("/admin/notifications");
   revalidatePath(`/admin/brands/${brandId}`);

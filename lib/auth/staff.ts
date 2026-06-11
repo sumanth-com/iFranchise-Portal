@@ -14,14 +14,3 @@ export function isSuperAdminProfile(profile: Profile): boolean {
 export function isAdminProfile(profile: Profile): boolean {
   return profile.role === "admin" && profile.is_active;
 }
-
-/** Login page "Admin" tab accepts admin and super_admin accounts. */
-export function matchesStaffLogin(
-  profile: Profile,
-  expected: "client" | "admin",
-): boolean {
-  if (expected === "client") {
-    return profile.role === "client";
-  }
-  return isStaffRole(profile.role);
-}

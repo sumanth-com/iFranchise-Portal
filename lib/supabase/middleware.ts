@@ -16,7 +16,7 @@ import {
 } from "@/lib/auth/paths";
 import { isStaffRole } from "@/lib/auth/staff";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
-import { authDebug, isDisabledStaffGate } from "@/lib/auth/profile";
+import { authDebug, authProfileTrace, isDisabledStaffGate } from "@/lib/auth/profile";
 import {
   isServiceUnavailableError,
   resolveUserFromGetUser,
@@ -93,13 +93,26 @@ async function loadProfileGate(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
 ): Promise<ProfileGate | null> {
+  authProfileTrace("middleware:loadProfileGate:start", { userId });
+
   try {
     const { profile, error } = await fetchProfileByUserId(supabase, userId);
 
     if (!profile) {
+      authProfileTrace(
+        "middleware:loadProfileGate:missing",
+        { userId, fetchError: error },
+        "error",
+      );
       authDebug("middleware-profile-missing", { userId, error });
       return null;
     }
+
+    authProfileTrace("middleware:loadProfileGate:ok", {
+      userId,
+      profileId: profile.id,
+      role: profile.role,
+    });
 
     authDebug("middleware-profile-ok", {
       userId,
@@ -116,6 +129,14 @@ async function loadProfileGate(
     if (isServiceUnavailableError(error)) {
       throw error;
     }
+    authProfileTrace(
+      "middleware:loadProfileGate:exception",
+      {
+        userId,
+        message: error instanceof Error ? error.message : String(error),
+      },
+      "error",
+    );
     authDebug("middleware-profile-error", {
       userId,
       error: error instanceof Error ? error.message : String(error),

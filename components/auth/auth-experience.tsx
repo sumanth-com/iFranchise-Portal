@@ -10,11 +10,6 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { RepairAccountButton } from "@/components/auth/repair-account-button";
 import { PremiumInput } from "@/components/auth/premium-input";
 import {
-  AUTH_ROLE_COPY,
-  RoleSelector,
-  type AuthPortalRole,
-} from "@/components/auth/role-selector";
-import {
   AUTH_ERROR_CODES,
   isBlockingAuthError,
 } from "@/lib/auth/auth-errors";
@@ -29,9 +24,23 @@ import { initialAuthActionState } from "@/types/auth";
 
 type AuthTab = "login" | "signup" | "forgot";
 
+const TAB_COPY: Record<AuthTab, { title: string; description: string }> = {
+  login: {
+    title: "Welcome back",
+    description: "Sign in with your iFranchise credentials.",
+  },
+  signup: {
+    title: "Create your account",
+    description: "Register as a brand owner to manage your franchise profile.",
+  },
+  forgot: {
+    title: "Reset your password",
+    description: "We'll email you a link to choose a new password.",
+  },
+};
+
 type AuthExperienceProps = {
   initialTab: AuthTab;
-  initialRole?: AuthPortalRole;
   redirectTo?: string | null;
   pageError?: string | null;
   authErrorCode?: string | null;
@@ -40,13 +49,8 @@ type AuthExperienceProps = {
   hasProfile?: boolean;
 };
 
-function parseInitialRole(value: AuthPortalRole | undefined): AuthPortalRole {
-  return value === "admin" ? "admin" : "client";
-}
-
 export function AuthExperience({
   initialTab,
-  initialRole,
   redirectTo,
   pageError,
   authErrorCode,
@@ -55,15 +59,10 @@ export function AuthExperience({
   hasProfile = false,
 }: AuthExperienceProps) {
   const [tab, setTab] = useState<AuthTab>(initialTab);
-  const [role, setRole] = useState<AuthPortalRole>(parseInitialRole(initialRole));
 
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);
-
-  useEffect(() => {
-    setRole(parseInitialRole(initialRole));
-  }, [initialRole]);
 
   const [loginState, loginAction, loginPending] = useActionState(
     login,
@@ -78,14 +77,7 @@ export function AuthExperience({
     initialAuthActionState,
   );
 
-  const roleCopy = AUTH_ROLE_COPY[role];
-
-  const title =
-    tab === "login"
-      ? "Welcome back"
-      : tab === "signup"
-        ? "Create your account"
-        : "Reset your password";
+  const tabCopy = TAB_COPY[tab];
 
   const pendingForTab =
     tab === "login"
@@ -113,8 +105,6 @@ export function AuthExperience({
       ? loginState.error
       : null;
 
-  const showRoleSelector = tab !== "forgot" && !showAccountIssue;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.99 }}
@@ -130,7 +120,7 @@ export function AuthExperience({
               ? "Account needs attention"
               : showUnavailableOnly && showAccountIssue
                 ? "Connection issue"
-                : title}
+                : tabCopy.title}
         </h1>
 
         {showAccountIssue ? (
@@ -139,21 +129,21 @@ export function AuthExperience({
               ? "Supabase environment variables are missing or invalid."
               : showUnavailableOnly
                 ? "We could not reach the authentication service."
-                : "You are signed in, but we could not finish loading your account."}
+                : hasSession
+                  ? "You are signed in, but we could not finish loading your account."
+                  : "We could not complete sign-in. Please try again."}
           </p>
         ) : (
           <AnimatePresence mode="wait">
             <motion.p
-              key={`${tab}-${role}`}
+              key={tab}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.22 }}
               className="mt-2 text-sm leading-relaxed text-slate-500"
             >
-              {tab === "forgot"
-                ? "We'll email you a link to choose a new password."
-                : roleCopy.description}
+              {tabCopy.description}
             </motion.p>
           </AnimatePresence>
         )}
@@ -201,12 +191,6 @@ export function AuthExperience({
         </div>
       ) : (
         <>
-          {showRoleSelector ? (
-            <div className="mt-5">
-              <RoleSelector value={role} onChange={setRole} />
-            </div>
-          ) : null}
-
           {tab !== "forgot" ? (
             <div className="mt-5 flex gap-3 rounded-[16px] bg-slate-50 p-1 ring-1 ring-slate-200/60">
               <TabButton active={tab === "login"} onClick={() => setTab("login")}>
@@ -227,7 +211,6 @@ export function AuthExperience({
                 {redirectTo ? (
                   <input type="hidden" name="redirectTo" value={redirectTo} />
                 ) : null}
-                <input type="hidden" name="expectedRole" value={role} />
 
                 <AuthAlert
                   error={loginFormError}
@@ -240,11 +223,7 @@ export function AuthExperience({
                   type="email"
                   autoComplete="email"
                   required
-                  placeholder={
-                    role === "admin"
-                      ? "e.g. admin@ifranchise.com"
-                      : "e.g. you@brand.com"
-                  }
+                  placeholder="you@company.com"
                   error={getFieldFormError(loginState.error, "email")}
                 />
 
@@ -283,11 +262,7 @@ export function AuthExperience({
                   disabled={pendingForTab}
                   className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
                 >
-                  {loginPending
-                    ? "Signing in..."
-                    : role === "admin"
-                      ? "Sign in as Admin →"
-                      : "Sign in as Brand Owner →"}
+                  {loginPending ? "Signing in..." : "Sign in"}
                 </Button>
 
                 <p className="pt-2 text-xs leading-relaxed text-slate-500">
@@ -311,62 +286,61 @@ export function AuthExperience({
             ) : null}
 
             {tab === "signup" ? (
-              role === "admin" ? (
-                <AdminSignupNotice onSwitchToLogin={() => setTab("login")} />
-              ) : (
-                <form action={signupAction} className="space-y-4">
-                  <input type="hidden" name="expectedRole" value="client" />
+              <form action={signupAction} className="space-y-4">
+                <AuthAlert
+                  error={
+                    signupState.error &&
+                    !isAccountLevelFormError(signupState.error)
+                      ? signupState.error
+                      : null
+                  }
+                  message={signupState.message}
+                />
 
-                  <AuthAlert
-                    error={
-                      signupState.error &&
-                      !isAccountLevelFormError(signupState.error)
-                        ? signupState.error
-                        : null
-                    }
-                    message={signupState.message}
-                  />
+                <PremiumInput
+                  label="Full name"
+                  name="fullName"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  placeholder="Jane Smith"
+                  error={getFieldFormError(signupState.error, "fullName")}
+                />
 
-                  <PremiumInput
-                    label="Full name"
-                    name="fullName"
-                    type="text"
-                    autoComplete="name"
-                    required
-                    placeholder="Jane Smith"
-                    error={getFieldFormError(signupState.error, "fullName")}
-                  />
+                <PremiumInput
+                  label="Email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@company.com"
+                  error={getFieldFormError(signupState.error, "email")}
+                />
 
-                  <PremiumInput
-                    label="Email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    placeholder="e.g. you@brand.com"
-                    error={getFieldFormError(signupState.error, "email")}
-                  />
+                <PremiumInput
+                  label="Password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  placeholder="At least 8 characters"
+                  error={getFieldFormError(signupState.error, "password")}
+                />
 
-                  <PremiumInput
-                    label="Password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    placeholder="At least 8 characters"
-                    error={getFieldFormError(signupState.error, "password")}
-                  />
+                <Button
+                  type="submit"
+                  disabled={pendingForTab}
+                  className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
+                >
+                  {signupPending ? "Creating account..." : "Create account"}
+                </Button>
 
-                  <Button
-                    type="submit"
-                    disabled={pendingForTab}
-                    className="h-[46px] rounded-[16px] bg-[#6D28D9] shadow-[0_18px_50px_rgba(109,40,217,0.25)] hover:bg-[#5B21B6]"
-                  >
-                    {signupPending ? "Creating account..." : "Create Brand Owner account"}
-                  </Button>
-                </form>
-              )
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Admin accounts are provisioned by the iFranchise team. If you
+                  have staff credentials, sign in instead.
+                </p>
+              </form>
             ) : null}
 
             {tab === "forgot" ? (
@@ -382,7 +356,7 @@ export function AuthExperience({
                   type="email"
                   autoComplete="email"
                   required
-                  placeholder="e.g. you@company.com"
+                  placeholder="you@company.com"
                   error={getFieldFormError(forgotState.error, "email")}
                 />
 
@@ -406,29 +380,6 @@ export function AuthExperience({
           </div>
         </>
       )}
-    </motion.div>
-  );
-}
-
-function AdminSignupNotice({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-[16px] border border-slate-200/80 bg-slate-50/80 px-4 py-5 text-sm text-slate-600"
-    >
-      <p className="font-semibold text-slate-900">Admin access is provisioned</p>
-      <p className="mt-2 leading-relaxed">
-        Admin accounts are created by the iFranchise team. If you already have
-        credentials, switch to Sign In and select Admin.
-      </p>
-      <button
-        type="button"
-        onClick={onSwitchToLogin}
-        className="mt-4 text-sm font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
-      >
-        Go to admin sign in →
-      </button>
     </motion.div>
   );
 }

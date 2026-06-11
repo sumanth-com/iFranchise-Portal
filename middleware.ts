@@ -40,6 +40,6 @@ export const config = {
      * Run auth middleware on app routes only.
      * Exclude static assets, images, and textures to avoid unnecessary Supabase calls.
      */
-    "/((?!_next/static|_next/image|favicon.ico|assets/|textures|api/|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|assets/|textures|api/|auth/callback|dev-login|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

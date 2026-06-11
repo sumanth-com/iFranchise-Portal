@@ -66,3 +66,18 @@ export function authDebug(
   }
   console.log(`[auth:${step}]`, payload);
 }
+
+/** Always logs — use on profile-load failures to surface real PostgREST/RLS errors. */
+export function authProfileTrace(
+  step: string,
+  payload: Record<string, unknown>,
+  level: "log" | "error" = "log",
+): void {
+  const line = `[auth-profile-trace:${step}]`;
+  if (level === "error") {
+    console.error(line, payload);
+  } else {
+    console.log(line, payload);
+  }
+  authDebug(step, payload);
+}

@@ -1,27 +1,17 @@
-import { TeamManagement } from "@/components/team/TeamManagement";
+import { TeamDirectoryPage } from "@/components/team/directory/team-directory-page";
 import { requireTeamAccess } from "@/lib/auth/session";
+import { isSuperAdminProfile } from "@/lib/auth/staff";
 import {
-  canDisableTeamMembers,
-  canEditTeamRoles,
   canInviteTeam,
 } from "@/lib/team/permissions";
-import {
-  getActivityLogs,
-  getPendingInvitations,
-  getTeamMembers,
-} from "@/lib/team/queries";
+import { getTeamMembers } from "@/lib/team/queries";
 import type { TeamRole } from "@/types/team";
 
 export default async function TeamPage() {
   const profile = await requireTeamAccess();
   const teamRole = profile.team_role as TeamRole;
 
-  const [{ members, error: membersError }, { invitations }, { logs }] =
-    await Promise.all([
-      getTeamMembers(),
-      getPendingInvitations(),
-      getActivityLogs(40),
-    ]);
+  const { members, error: membersError } = await getTeamMembers();
 
   return (
     <>
@@ -31,20 +21,13 @@ export default async function TeamPage() {
           role="alert"
         >
           {membersError}
-          <span className="mt-2 block text-xs">
-            Run migration 004_team_management.sql in Supabase if you have not
-            yet.
-          </span>
         </p>
       ) : null}
-      <TeamManagement
+      <TeamDirectoryPage
         currentProfile={profile}
-        members={members}
-        invitations={invitations}
-        logs={logs}
+        supabaseMembers={members}
+        isSuperAdmin={isSuperAdminProfile(profile)}
         canInvite={canInviteTeam(teamRole)}
-        canEdit={canEditTeamRoles(teamRole)}
-        canDisable={canDisableTeamMembers(teamRole)}
       />
     </>
   );

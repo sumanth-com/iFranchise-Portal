@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   authDebug,
+  authProfileTrace,
   normalizeProfile,
   PROFILE_CORE_FIELDS,
   PROFILE_TEAM_FIELDS,
@@ -32,6 +33,12 @@ export async function fetchProfileByUserId(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ProfileQueryResult> {
+  authProfileTrace("fetchProfileByUserId:start", {
+    userId,
+    table: "public.profiles",
+    columns: PROFILE_CORE_FIELDS,
+  });
+
   const core = await supabase
     .from("profiles")
     .select(PROFILE_CORE_FIELDS)
@@ -40,8 +47,32 @@ export async function fetchProfileByUserId(
 
   if (core.error) {
     if (isServiceUnavailableError(core.error)) {
+      authProfileTrace(
+        "fetchProfileByUserId:core-network-error",
+        {
+          userId,
+          message: core.error.message,
+          code: core.error.code,
+          details: core.error.details,
+          hint: core.error.hint,
+        },
+        "error",
+      );
       throw core.error;
     }
+
+    authProfileTrace(
+      "fetchProfileByUserId:core-query-failed",
+      {
+        userId,
+        table: "public.profiles",
+        message: core.error.message,
+        code: core.error.code,
+        details: core.error.details,
+        hint: core.error.hint,
+      },
+      "error",
+    );
 
     authDebug("profile-load-failed", {
       userId,
@@ -58,6 +89,15 @@ export async function fetchProfileByUserId(
   }
 
   if (!core.data) {
+    authProfileTrace(
+      "fetchProfileByUserId:core-no-row",
+      {
+        userId,
+        table: "public.profiles",
+        message: "Profile record not found (query ok, zero rows — missing row or RLS hide)",
+      },
+      "error",
+    );
     authDebug("profile-load-missing", { userId });
     return {
       profile: null,
@@ -84,6 +124,14 @@ export async function fetchProfileByUserId(
   }
 
   const profile = normalizeProfile(row);
+
+  authProfileTrace("fetchProfileByUserId:ok", {
+    userId,
+    profileId: profile.id,
+    role: profile.role,
+    team_role: profile.team_role,
+    is_active: profile.is_active,
+  });
 
   authDebug("profile-load", {
     userId,

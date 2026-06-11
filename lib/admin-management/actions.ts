@@ -3,10 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
+import {
+  adminRoleToPortalRole,
+  adminRoleToTeamRole,
+} from "@/lib/admin-management/permissions-display";
 import { requireSuperAdmin } from "@/lib/auth/session";
 import { logActivity } from "@/lib/team/activity";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { AdminDisplayRole } from "@/types/admin-command-center";
 import type { TeamActionState } from "@/types/team";
 import { initialTeamActionState } from "@/types/team";
 
@@ -25,6 +30,13 @@ async function getOrigin(): Promise<string> {
   return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
+function parseAdminRole(value: string): AdminDisplayRole | null {
+  if (value === "admin" || value === "senior_admin" || value === "super_admin") {
+    return value;
+  }
+  return null;
+}
+
 export async function inviteAdminAccount(
   _prev: TeamActionState,
   formData: FormData,
@@ -33,10 +45,19 @@ export async function inviteAdminAccount(
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const fullName = String(formData.get("fullName") ?? "").trim() || null;
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const adminRole = parseAdminRole(String(formData.get("adminRole") ?? "admin"));
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "A valid email is required.", message: null };
   }
+
+  if (!adminRole) {
+    return { error: "A valid administrator role is required.", message: null };
+  }
+
+  const teamRole = adminRoleToTeamRole(adminRole);
+  const portalRole = adminRoleToPortalRole(adminRole);
 
   const supabase = await createClient();
 
@@ -50,11 +71,25 @@ export async function inviteAdminAccount(
     return { error: "This email is already a staff account.", message: null };
   }
 
+  const { data: pendingInvite } = await supabase
+    .from("team_invitations")
+    .select("id")
+    .eq("email", email)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (pendingInvite) {
+    return {
+      error: "A pending invitation already exists for this email.",
+      message: null,
+    };
+  }
+
   const { data: invitation, error: inviteError } = await supabase
     .from("team_invitations")
     .insert({
       email,
-      team_role: "admin",
+      team_role: teamRole,
       invited_by: actor.id,
     })
     .select("id, token")
@@ -73,8 +108,10 @@ export async function inviteAdminAccount(
       {
         data: {
           full_name: fullName,
-          team_role: "admin",
-          portal_role: "admin",
+          phone,
+          team_role: teamRole,
+          portal_role: portalRole,
+          admin_role: adminRole,
           invitation_id: invitation.id,
         },
         redirectTo: `${origin}/auth/callback?next=/admin`,
@@ -99,7 +136,7 @@ export async function inviteAdminAccount(
     action: "admin.invited",
     entityType: "invitation",
     entityId: invitation.id,
-    metadata: { email },
+    metadata: { email, admin_role: adminRole, team_role: teamRole },
   });
 
   revalidateAdminManagement();
@@ -274,6 +311,143 @@ export async function sendAdminPasswordReset(
   };
 }
 
+export async function changeAdminRole(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const actor = await requireSuperAdmin();
+
+  const memberId = String(formData.get("memberId") ?? "").trim();
+  const adminRole = parseAdminRole(String(formData.get("adminRole") ?? ""));
+
+  if (!memberId || !adminRole) {
+    return { error: "Member and role are required.", message: null };
+  }
+
+  if (memberId === actor.id) {
+    return { error: "You cannot change your own role here.", message: null };
+  }
+
+  const teamRole = adminRoleToTeamRole(adminRole);
+  const portalRole = adminRoleToPortalRole(adminRole);
+
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from("profiles")
+    .select("email, role, team_role")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (!member || (member.role !== "admin" && member.role !== "super_admin")) {
+    return { error: "Admin account not found.", message: null };
+  }
+
+  if (member.role === "super_admin" && adminRole !== "super_admin") {
+    return {
+      error: "Super admin accounts cannot be downgraded from this screen.",
+      message: null,
+    };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ team_role: teamRole, role: portalRole })
+    .eq("id", memberId);
+
+  if (error) {
+    return { error: error.message, message: null };
+  }
+
+  await logActivity({
+    actorId: actor.id,
+    action: "admin.role_changed",
+    entityType: "profile",
+    entityId: memberId,
+    metadata: {
+      email: member.email,
+      from: member.team_role,
+      to: teamRole,
+      admin_role: adminRole,
+    },
+  });
+
+  revalidateAdminManagement();
+  return { error: null, message: "Administrator role updated." };
+}
+
+export async function resendAdminInvitation(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const actor = await requireSuperAdmin();
+  const invitationId = String(formData.get("invitationId") ?? "").trim();
+
+  if (!invitationId) {
+    return { error: "Invitation ID is required.", message: null };
+  }
+
+  const supabase = await createClient();
+  const { data: invitation } = await supabase
+    .from("team_invitations")
+    .select("id, email, team_role, status")
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  if (!invitation || invitation.status !== "pending") {
+    return { error: "Pending invitation not found.", message: null };
+  }
+
+  const serviceClient = createServiceClient();
+  if (!serviceClient) {
+    return {
+      error: "Resend requires SUPABASE_SERVICE_ROLE_KEY.",
+      message: null,
+    };
+  }
+
+  const portalRole =
+    invitation.team_role === "super_admin" ? "super_admin" : "admin";
+  const origin = await getOrigin();
+
+  const { error: authError } = await serviceClient.auth.admin.inviteUserByEmail(
+    invitation.email,
+    {
+      data: {
+        team_role: invitation.team_role,
+        portal_role: portalRole,
+        invitation_id: invitation.id,
+      },
+      redirectTo: `${origin}/auth/callback?next=/admin`,
+    },
+  );
+
+  if (authError) {
+    return { error: authError.message, message: null };
+  }
+
+  await supabase
+    .from("team_invitations")
+    .update({
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", invitation.id);
+
+  await logActivity({
+    actorId: actor.id,
+    action: "admin.invitation_resent",
+    entityType: "invitation",
+    entityId: invitation.id,
+    metadata: { email: invitation.email },
+  });
+
+  revalidateAdminManagement();
+  return {
+    error: null,
+    message: `Invitation resent to ${invitation.email}.`,
+  };
+}
+
 export async function revokeAdminInvitation(
   _prev: TeamActionState,
   formData: FormData,
@@ -308,6 +482,34 @@ export async function revokeAdminInvitation(
 }
 
 export const initialAdminManagementState = initialTeamActionState;
+
+export async function dispatchAdminDirectoryAction(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const intent = String(formData.get("intent") ?? "");
+
+  switch (intent) {
+    case "suspend":
+    case "activate":
+      return setAdminAccountActive(_prev, formData);
+    case "remove-invite":
+      return revokeAdminInvitation(_prev, formData);
+    case "remove-admin":
+      formData.set("isActive", "false");
+      return setAdminAccountActive(_prev, formData);
+    case "resend":
+      return resendAdminInvitation(_prev, formData);
+    case "edit":
+      return updateAdminAccount(_prev, formData);
+    case "role":
+      return changeAdminRole(_prev, formData);
+    case "reset":
+      return sendAdminPasswordReset(_prev, formData);
+    default:
+      return { error: "Unknown action.", message: null };
+  }
+}
 
 export async function revokeAdminInvitationForm(formData: FormData): Promise<void> {
   await revokeAdminInvitation(initialAdminManagementState, formData);

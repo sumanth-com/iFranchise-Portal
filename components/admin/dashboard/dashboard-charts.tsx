@@ -27,7 +27,6 @@ type DashboardChartsProps = {
   showHeader?: boolean;
 };
 
-const CHART_COLORS = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#E11D48", "#64748B"];
 const FUNNEL_COLORS = ["#7C3AED", "#6366F1", "#3B82F6", "#10B981"];
 
 function ChartCard({
@@ -89,7 +88,6 @@ export function DashboardCharts({ charts, showHeader = true }: DashboardChartsPr
   const hasSubmissions = charts.brandSubmissions.some((d) => d.value > 0);
   const hasApprovals = charts.monthlyApprovals.some((d) => d.value > 0);
   const hasFunnel = charts.leadFunnel.some((d) => d.value > 0);
-  const hasCategories = charts.topCategories.length > 0;
 
   return (
     <section className="space-y-4">
@@ -187,29 +185,6 @@ export function DashboardCharts({ charts, showHeader = true }: DashboardChartsPr
                   ))}
                 </Funnel>
               </FunnelChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard
-          title="Top performing categories"
-          subtitle="Brand distribution by industry"
-          empty={!hasCategories}
-          className="sm:col-span-2"
-        >
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={charts.topCategories} layout="vertical" margin={{ left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94A3B8" allowDecimals={false} />
-                <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10 }} stroke="#94A3B8" />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {charts.topCategories.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>

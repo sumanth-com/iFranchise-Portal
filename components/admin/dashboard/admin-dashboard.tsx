@@ -7,8 +7,8 @@ import { DashboardActivityTimeline } from "@/components/admin/dashboard/dashboar
 import { DashboardAnalyticsGrid } from "@/components/admin/dashboard/dashboard-analytics-grid";
 import { DashboardCharts } from "@/components/admin/dashboard/dashboard-charts";
 import { DashboardHero } from "@/components/admin/dashboard/dashboard-hero";
-import { DashboardInsights } from "@/components/admin/dashboard/dashboard-insights";
 import { DashboardPerformanceSection } from "@/components/admin/dashboard/dashboard-performance";
+import { DashboardPlatformPulse } from "@/components/admin/dashboard/dashboard-platform-pulse";
 import { fadeUp } from "@/lib/motion";
 import type { AdminDashboardData } from "@/types/admin-dashboard";
 
@@ -56,7 +56,11 @@ export function AdminDashboard({ data, adminName }: AdminDashboardProps) {
         </div>
       </section>
 
-      <DashboardInsights insights={data.insights} />
+      <DashboardPlatformPulse
+        analytics={data.analytics}
+        hero={data.hero}
+        categories={data.charts.topCategories}
+      />
 
       <DashboardPerformanceSection performance={data.performance} />
 

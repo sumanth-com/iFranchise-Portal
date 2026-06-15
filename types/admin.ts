@@ -69,14 +69,20 @@ export function canAdminReviewBrand(status: BrandStatus): boolean {
   return status === "submitted";
 }
 
-export function canAdminPublishBrand(brand: Brand): boolean {
+export function canAdminPublishBrand(
+  brand: Pick<Brand, "status" | "published_at">,
+): boolean {
   return brand.status === "approved" && !brand.published_at;
 }
 
-export function canAdminUnpublishBrand(brand: Brand): boolean {
+export function canAdminUnpublishBrand(
+  brand: Pick<Brand, "status" | "published_at">,
+): boolean {
   return brand.status === "approved" && Boolean(brand.published_at);
 }
 
-export function isBrandPublished(brand: Brand): boolean {
+export function isBrandPublished(
+  brand: Pick<Brand, "status" | "published_at">,
+): boolean {
   return brand.status === "approved" && Boolean(brand.published_at);
 }

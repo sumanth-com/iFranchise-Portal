@@ -20,6 +20,33 @@ export function formatDate(value: string | null): string | null {
   });
 }
 
+/** Stable today label for SSR + client hydration (compute once on the server). */
+export function formatTodayBanner(now = new Date()): {
+  label: string;
+  dateTime: string;
+} {
+  const label = now.toLocaleDateString(LOCALE, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const dateTime = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  return { label, dateTime };
+}
+
+export function formatGreeting(now = new Date()): string {
+  const hour = now.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export function splitDateTime(value: string | null): { date: string; time: string } {
   if (!value) return { date: "—", time: "—" };
   const d = new Date(value);

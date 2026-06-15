@@ -9,13 +9,14 @@ import { MobileDrawer } from "@/components/dashboard/client/mobile-drawer";
 import { PageTransition } from "@/components/layout/page-transition";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { adminNavGroups, type ClientNavGroup } from "@/lib/nav-config";
+import type { AdminNotificationPreview } from "@/lib/notifications/types";
 
 type AdminShellProps = {
   children: ReactNode;
   userId: string;
   email: string;
   name?: string | null;
-  notificationCount?: number;
+  notifications?: AdminNotificationPreview[];
   navGroups?: ClientNavGroup[];
 };
 
@@ -24,7 +25,7 @@ export function AdminShell({
   userId,
   email,
   name,
-  notificationCount = 0,
+  notifications = [],
   navGroups = adminNavGroups,
 }: AdminShellProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -50,9 +51,9 @@ export function AdminShell({
             userId={userId}
             email={email}
             name={name}
-            notificationCount={notificationCount}
+            notifications={notifications}
           />
-          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain scroll-smooth antialiased">
             <div className="w-full px-3 py-5 sm:px-4 sm:py-6 lg:px-5">
               <PageTransition>{children}</PageTransition>
             </div>

@@ -34,60 +34,65 @@ export function TeamDirectoryFilters({
   onRoleChange,
 }: TeamDirectoryFiltersProps) {
   return (
-    <div className="grid gap-3 lg:grid-cols-5">
-      <div className="relative lg:col-span-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <Input
-          value={nameQuery}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder="Search by name..."
-          className="pl-10"
-        />
+    <div className="w-full rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        Search & filters
+      </p>
+      <div className="mt-3 grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="relative sm:col-span-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={nameQuery}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Search by name..."
+            className="pl-10"
+          />
+        </div>
+        <div className="relative sm:col-span-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={emailQuery}
+            onChange={(e) => onEmailChange(e.target.value)}
+            placeholder="Search by email..."
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={department}
+          onChange={(e) => onDepartmentChange(e.target.value)}
+          className={selectClass}
+          aria-label="Filter by department"
+        >
+          {TEAM_DEPARTMENTS.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+        <select
+          value={status}
+          onChange={(e) => onStatusChange(e.target.value)}
+          className={selectClass}
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select
+          value={role}
+          onChange={(e) => onRoleChange(e.target.value)}
+          className={selectClass}
+          aria-label="Filter by role"
+        >
+          <option value="all">All roles</option>
+          {TEAM_DESIGNATIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="relative lg:col-span-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <Input
-          value={emailQuery}
-          onChange={(e) => onEmailChange(e.target.value)}
-          placeholder="Search by email..."
-          className="pl-10"
-        />
-      </div>
-      <select
-        value={department}
-        onChange={(e) => onDepartmentChange(e.target.value)}
-        className={selectClass}
-        aria-label="Filter by department"
-      >
-        {TEAM_DEPARTMENTS.map((d) => (
-          <option key={d} value={d}>
-            {d}
-          </option>
-        ))}
-      </select>
-      <select
-        value={status}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className={selectClass}
-        aria-label="Filter by status"
-      >
-        <option value="all">All Statuses</option>
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-      </select>
-      <select
-        value={role}
-        onChange={(e) => onRoleChange(e.target.value)}
-        className={selectClass}
-        aria-label="Filter by role"
-      >
-        <option value="all">All Roles</option>
-        {TEAM_DESIGNATIONS.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }

@@ -1,16 +1,19 @@
 import type { AdminBrandListItem } from "@/types/admin";
 
+import { buildAdminNotificationMessage } from "./admin-notification-message";
 import type { AdminNotification } from "./types";
 
 type BuildAdminNotificationsOptions = {
   brands: AdminBrandListItem[];
   brandOwnerCount?: number;
+  adminName?: string;
 };
 
 export function buildAdminNotifications(
   options: BuildAdminNotificationsOptions,
 ): AdminNotification[] {
-  const { brands, brandOwnerCount = 0 } = options;
+  const { brands, brandOwnerCount = 0, adminName = "Marketplace Admin" } =
+    options;
   const items: AdminNotification[] = [];
 
   for (const brand of brands) {
@@ -27,9 +30,12 @@ export function buildAdminNotifications(
             60_000,
       );
 
+      const category = isResubmission ? "resubmission" : "new_submission";
+      const id = `${brand.id}-${isResubmission ? "resubmission" : "new-submission"}`;
+
       items.push({
-        id: `${brand.id}-${isResubmission ? "resubmission" : "new-submission"}`,
-        category: isResubmission ? "resubmission" : "new_submission",
+        id,
+        category,
         title: isResubmission ? "Brand resubmitted" : "New brand submission",
         description: isResubmission
           ? `"${label}" was resubmitted by ${ownerLabel}.`
@@ -37,18 +43,32 @@ export function buildAdminNotifications(
         time: brand.submitted_at ?? brand.created_at,
         href,
         brandName: label,
+        ownerName: ownerLabel,
+        message: buildAdminNotificationMessage({
+          category,
+          brandName: label,
+          ownerName: ownerLabel,
+          adminName,
+        }),
       });
     }
   }
 
   if (brandOwnerCount > 0) {
+    const id = "brand-owner-count";
+
     items.push({
-      id: "brand-owner-count",
+      id,
       category: "owner_activity",
       title: "Brand owner activity",
       description: `${brandOwnerCount} brand owner${brandOwnerCount === 1 ? "" : "s"} registered on the platform.`,
       time: new Date().toISOString(),
       href: "/admin/brands",
+      message: buildAdminNotificationMessage({
+        category: "owner_activity",
+        brandOwnerCount,
+        adminName,
+      }),
     });
   }
 

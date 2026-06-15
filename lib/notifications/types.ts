@@ -14,6 +14,16 @@ export type AdminNotificationCategory =
   | "resubmission"
   | "owner_activity";
 
+export type AdminNotificationMessage = {
+  greetingName: string;
+  paragraphs: string[];
+  highlight?: { label: string; value: string };
+  instructions?: { title: string; items: string[] };
+  notice?: { title: string; paragraphs: string[] };
+  closing: string;
+  signOff: string;
+};
+
 export type PortalNotification = {
   id: string;
   category: NotificationCategory;
@@ -32,7 +42,14 @@ export type AdminNotification = {
   time: string | null;
   href: string;
   brandName?: string;
+  ownerName?: string;
+  message: AdminNotificationMessage;
 };
+
+export type AdminNotificationPreview = Pick<
+  AdminNotification,
+  "id" | "title" | "description" | "time" | "category"
+>;
 
 export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
   brand_submitted: "Brand Submitted",

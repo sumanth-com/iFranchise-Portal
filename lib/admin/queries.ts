@@ -1,4 +1,6 @@
 import { buildAdminActivityFeed } from "@/lib/admin/activity-feed";
+import { BRAND_ASSETS_BUCKET, SIGNED_URL_EXPIRY_SECONDS } from "@/lib/assets/constants";
+import { getAssetsAdminClient } from "@/lib/assets/storage-admin";
 import { BRAND_SELECT_FIELDS } from "@/lib/brand/queries";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -23,19 +25,24 @@ function getOwnerName(profiles: ProfileEmbed | ProfileEmbed[]): string | null {
   return profile?.full_name ?? null;
 }
 
-function mapBrandRow(row: {
-  id: string;
-  business_name: string;
-  industry: string | null;
-  status: BrandStatus;
-  created_at: string;
-  submitted_at: string | null;
-  published_at: string | null;
-  profiles: ProfileEmbed | ProfileEmbed[];
-}): AdminBrandListItem {
+function mapBrandRow(
+  row: {
+    id: string;
+    business_name: string;
+    tagline: string | null;
+    industry: string | null;
+    status: BrandStatus;
+    created_at: string;
+    submitted_at: string | null;
+    published_at: string | null;
+    profiles: ProfileEmbed | ProfileEmbed[];
+  },
+  logoUrl: string | null,
+): AdminBrandListItem {
   return {
     id: row.id,
     business_name: row.business_name,
+    tagline: row.tagline,
     industry: row.industry,
     status: row.status,
     created_at: row.created_at,
@@ -43,11 +50,42 @@ function mapBrandRow(row: {
     published_at: row.published_at,
     owner_email: getOwnerEmail(row.profiles),
     owner_name: getOwnerName(row.profiles),
+    logo_url: logoUrl,
   };
 }
 
+async function fetchLogoUrlsForBrands(
+  brandIds: string[],
+): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
+  if (brandIds.length === 0) return urlMap;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("brand_assets")
+    .select("brand_id, storage_path")
+    .in("brand_id", brandIds)
+    .eq("asset_type", "logo");
+
+  const admin = getAssetsAdminClient();
+  if (!admin || !data?.length) return urlMap;
+
+  await Promise.all(
+    data.map(async (row) => {
+      const { data: signed } = await admin.storage
+        .from(BRAND_ASSETS_BUCKET)
+        .createSignedUrl(row.storage_path, SIGNED_URL_EXPIRY_SECONDS);
+      if (signed?.signedUrl) {
+        urlMap.set(row.brand_id, signed.signedUrl);
+      }
+    }),
+  );
+
+  return urlMap;
+}
+
 const LIST_SELECT =
-  "id, business_name, industry, status, created_at, submitted_at, published_at, profiles!brands_user_id_fkey (email, full_name)";
+  "id, business_name, tagline, industry, status, created_at, submitted_at, published_at, profiles!brands_user_id_fkey (email, full_name)";
 
 export async function getAdminDashboardStats(): Promise<{
   stats: AdminDashboardStats;
@@ -159,10 +197,10 @@ export async function getAdminBrands(filters: {
     };
   }
 
-  const brands = (data ?? []).map((row) =>
-    mapBrandRow(
-      row as Parameters<typeof mapBrandRow>[0],
-    ),
+  const rows = data ?? [];
+  const logoUrls = await fetchLogoUrlsForBrands(rows.map((row) => row.id));
+  const brands = rows.map((row) =>
+    mapBrandRow(row as Parameters<typeof mapBrandRow>[0], logoUrls.get(row.id) ?? null),
   );
 
   return {

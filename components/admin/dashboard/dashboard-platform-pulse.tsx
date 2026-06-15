@@ -194,13 +194,13 @@ export function DashboardPlatformPulse({
     <motion.section {...fadeUp} className="space-y-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
-          Operational snapshot
+          Strategic overview
         </p>
         <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-          Platform pulse
+          Marketplace intelligence
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Where brands sit in your pipeline and what deserves attention next.
+          Pipeline health, priorities, and portfolio mix — without duplicating your review queue.
         </p>
       </div>
 

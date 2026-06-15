@@ -27,6 +27,16 @@ export default async function AdminLayout({
     brandOwnerCount: stats.totalBrandOwners,
   });
 
+  const notificationPreviews = notifications.map(
+    ({ id, title, description, time, category }) => ({
+      id,
+      title,
+      description,
+      time,
+      category,
+    }),
+  );
+
   const navGroups = adminNavGroups.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -46,9 +56,7 @@ export default async function AdminLayout({
       email={profile.email}
       name={profile.full_name}
       navGroups={navGroups}
-      notificationCount={notifications.filter((n) =>
-        ["new_submission", "resubmission"].includes(n.category),
-      ).length}
+      notifications={notificationPreviews}
     >
       {children}
     </AdminShell>

@@ -173,8 +173,8 @@ export async function rejectBrand(
   formData: FormData,
 ): Promise<AdminActionState> {
   return reviewBrand(formData, "rejected", {
-    requireFeedback: true,
-    successMessage: "Brand rejected. The brand owner will see your feedback.",
+    requireFeedback: false,
+    successMessage: "Brand rejected. The brand owner will be notified.",
     action: "brand.rejected",
     permissionCheck: canReviewBrands,
   });
@@ -185,7 +185,7 @@ export async function requestBrandChanges(
   formData: FormData,
 ): Promise<AdminActionState> {
   return reviewBrand(formData, "changes_requested", {
-    requireFeedback: true,
+    requireFeedback: false,
     successMessage: "Changes requested. The brand owner can edit and resubmit.",
     action: "brand.changes_requested",
     permissionCheck: canReviewBrands,

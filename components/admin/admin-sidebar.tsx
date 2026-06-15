@@ -77,7 +77,11 @@ export function AdminSidebar({ groups, collapsed, onToggle }: AdminSidebarProps)
         collapsed ? "w-[72px]" : "w-[var(--sidebar-width)]",
       )}
     >
-      <SidebarToggleHeader collapsed={collapsed} onToggle={onToggle} />
+      <SidebarToggleHeader
+        collapsed={collapsed}
+        onToggle={onToggle}
+        homeHref="/admin"
+      />
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
         {groups.map((group) => (

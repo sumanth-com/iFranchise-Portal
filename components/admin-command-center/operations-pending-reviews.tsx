@@ -1,21 +1,31 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState } from "react";
-import { ArrowRight, Check, Eye, X } from "lucide-react";
+import { ArrowRight, Check, Eye } from "lucide-react";
 
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { Button } from "@/components/ui/button";
-import { approveBrand, rejectBrand } from "@/lib/admin/actions";
-import { formatDate } from "@/lib/format-date";
-import { fadeUp } from "@/lib/motion";
+import { approveBrand } from "@/lib/admin/actions";
+import { formatDate, formatRelativeTime } from "@/lib/format-date";
+import { fadeUp, staggerContainer, staggerItem } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import type { AdminBrandListItem } from "@/types/admin";
 import { initialAdminActionState } from "@/types/admin";
 
 type OperationsPendingReviewsProps = {
   brands: AdminBrandListItem[];
 };
+
+function brandInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
 
 export function OperationsPendingReviews({
   brands,
@@ -24,33 +34,26 @@ export function OperationsPendingReviews({
     approveBrand,
     initialAdminActionState,
   );
-  const [rejectState, rejectAction, rejecting] = useActionState(
-    rejectBrand,
-    initialAdminActionState,
-  );
-
-  const busy = approving || rejecting;
-  const alertError = state.error ?? rejectState.error;
-  const alertMessage = state.message ?? rejectState.message;
 
   return (
     <motion.section
       id="pending-reviews"
       {...fadeUp}
-      className="scroll-mt-20 rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+      className="scroll-mt-20 overflow-hidden rounded-2xl border border-violet-100/80 bg-white shadow-sm ring-1 ring-violet-50"
     >
-      <div className="border-b border-slate-100 p-6 sm:p-8">
+      <div className="border-b border-violet-100/80 bg-gradient-to-r from-violet-50/80 via-white to-purple-50/40 px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
-              Review Queue
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-600">
+              Priority
             </p>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">
-              Pending Reviews
+              Brands awaiting decision
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {brands.length} brand{brands.length === 1 ? "" : "s"} awaiting
-              decision
+            <p className="mt-0.5 text-sm text-slate-500">
+              {brands.length === 0
+                ? "You're all caught up — no pending reviews."
+                : `${brands.length} listing${brands.length === 1 ? "" : "s"} need action`}
             </p>
           </div>
           <Link
@@ -61,55 +64,77 @@ export function OperationsPendingReviews({
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="mt-4">
-          <AuthAlert error={alertError} message={alertMessage} />
+        <div className="mt-3">
+          <AuthAlert error={state.error} message={state.message} />
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-6 py-3">Brand</th>
-              <th className="px-4 py-3">Owner</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Submitted</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-6 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {brands.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
-                  No brands pending review.
-                </td>
-              </tr>
-            ) : (
-              brands.map((brand) => (
-                <tr
+      <div className="p-5 sm:p-6">
+        {brands.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-violet-200 bg-violet-50/30 px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-600">Queue is clear</p>
+            <p className="mt-1 text-xs text-slate-400">
+              New submissions will show up here first.
+            </p>
+          </div>
+        ) : (
+          <motion.ul
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+            className="space-y-3"
+          >
+            {brands.map((brand) => {
+              const submitted =
+                formatRelativeTime(brand.submitted_at ?? brand.created_at) ??
+                "Recently";
+
+              return (
+                <motion.li
                   key={brand.id}
-                  className="border-b border-slate-50 hover:bg-slate-50/60"
+                  variants={staggerItem}
+                  className="group rounded-xl border border-slate-200/80 bg-gradient-to-r from-white to-violet-50/20 p-4 transition-all hover:border-violet-200 hover:shadow-md"
                 >
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {brand.business_name}
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    {brand.owner_name ?? brand.owner_email}
-                  </td>
-                  <td className="px-4 py-4 text-slate-600">
-                    {brand.industry ?? "—"}
-                  </td>
-                  <td className="px-4 py-4 text-slate-500">
-                    {formatDate(brand.submitted_at ?? brand.created_at) ?? "—"}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
-                      Pending
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border-2 border-white bg-white shadow-sm ring-1 ring-violet-100">
+                      {brand.logo_url ? (
+                        <Image
+                          src={brand.logo_url}
+                          alt=""
+                          fill
+                          unoptimized
+                          className="object-contain p-1"
+                          sizes="48px"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600 to-purple-600 text-xs font-bold text-white">
+                          {brandInitials(brand.business_name)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-900 group-hover:text-violet-700">
+                        {brand.business_name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {brand.owner_name ?? brand.owner_email}
+                        {brand.industry ? (
+                          <span className="text-slate-300"> · </span>
+                        ) : null}
+                        {brand.industry ? (
+                          <span className="capitalize">{brand.industry}</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Submitted {submitted}
+                        {formatDate(brand.submitted_at ?? brand.created_at)
+                          ? ` · ${formatDate(brand.submitted_at ?? brand.created_at)}`
+                          : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                       <Link href={`/admin/brands/${brand.id}`}>
                         <Button type="button" variant="secondary" size="sm">
                           <Eye className="mr-1 h-3.5 w-3.5" />
@@ -121,37 +146,22 @@ export function OperationsPendingReviews({
                         <Button
                           type="submit"
                           size="sm"
-                          disabled={busy}
-                          className="min-w-[88px]"
+                          disabled={approving}
+                          className={cn(
+                            "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700",
+                          )}
                         >
                           <Check className="mr-1 h-3.5 w-3.5" />
                           {approving ? "..." : "Approve"}
                         </Button>
                       </form>
-                      <form action={rejectAction}>
-                        <input type="hidden" name="brandId" value={brand.id} />
-                        <input
-                          type="hidden"
-                          name="adminFeedback"
-                          value="Does not meet listing requirements."
-                        />
-                        <Button
-                          type="submit"
-                          variant="danger"
-                          size="sm"
-                          disabled={busy}
-                        >
-                          <X className="mr-1 h-3.5 w-3.5" />
-                          Reject
-                        </Button>
-                      </form>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+        )}
       </div>
     </motion.section>
   );

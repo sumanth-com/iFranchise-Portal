@@ -52,6 +52,10 @@
   --dash-muted: #000000;
 }
 
+[data-dashboard="admin"] {
+  --topbar-height: 4rem;
+}
+
 /* Brand Owner dashboard — white page background */
 [data-dashboard="client"] {
   background-color: #ffffff;
@@ -201,6 +205,18 @@ body {
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+}
+
+.card-premium-dark {
+  background: linear-gradient(
+    155deg,
+    rgba(36, 22, 72, 0.96) 0%,
+    rgba(18, 10, 38, 0.98) 45%,
+    rgba(10, 6, 24, 1) 100%
+  );
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(167, 139, 250, 0.08);
 }
 
 .skeleton-shimmer {

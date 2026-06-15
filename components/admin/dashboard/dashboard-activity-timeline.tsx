@@ -60,16 +60,11 @@ export function DashboardActivityTimeline({
         className,
       )}
     >
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
-            Activity
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-900">Live operations feed</h2>
-        </div>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-          Real-time
-        </span>
+      <div className="mb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
+          Activity
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">Recent updates</h2>
       </div>
 
       {items.length === 0 ? (

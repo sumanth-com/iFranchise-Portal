@@ -31,8 +31,17 @@ async function getOrigin(): Promise<string> {
 }
 
 function parseAdminRole(value: string): AdminDisplayRole | null {
-  if (value === "admin" || value === "senior_admin" || value === "super_admin") {
+  if (
+    value === "admin" ||
+    value === "super_admin" ||
+    value === "founder" ||
+    value === "cofounder"
+  ) {
     return value;
+  }
+  // Legacy value from earlier UI — treat as team Admin.
+  if (value === "senior_admin") {
+    return "admin";
   }
   return null;
 }

@@ -265,17 +265,17 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
       totalBrands: {
         value: stats.totalBrands,
         changePercent: trendFromDates(brandDates),
-        href: "#brands",
+        href: "/admin/brands",
       },
       pendingReviews: {
         value: stats.pendingReviews,
         changePercent: trendFromDates(pendingDates),
-        href: "#pending-reviews",
+        href: "/admin/reviews",
       },
       totalLeads: {
         value: leads.length,
         changePercent: trendFromDates(leadDates),
-        href: "#leads",
+        href: "/admin/leads",
       },
       totalAdmins: {
         value: directory.filter((d) => !d.isInvitation).length,

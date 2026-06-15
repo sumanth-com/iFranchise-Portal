@@ -3,11 +3,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Briefcase,
+  Cake,
   Calendar,
   Clock,
   Mail,
   Pencil,
   Phone,
+  UserRound,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -86,22 +88,30 @@ export function TeamProfileDrawer({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="flex flex-col items-center text-center">
-                <TeamMemberAvatar
-                  name={current.full_name}
-                  image={current.profile_image}
-                  size="xl"
-                />
+                <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-50 p-1 shadow-md ring-1 ring-violet-100">
+                  <TeamMemberAvatar
+                    name={current.full_name}
+                    image={current.profile_image}
+                    size="profile"
+                    imagePosition={
+                      current.profile_image_position ?? "center top"
+                    }
+                    className="ring-0 shadow-none"
+                  />
+                </div>
                 {!editing ? (
                   <>
-                    <h3 className="mt-4 text-xl font-bold text-slate-900">
+                    <h3 className="mt-4 text-lg font-bold text-slate-900">
                       {current.full_name}
                     </h3>
-                    <p className="text-sm text-violet-600">{current.role}</p>
+                    <p className="mt-1.5 max-w-full rounded-lg bg-violet-50 px-3 py-1 text-xs font-semibold leading-snug text-violet-800 ring-1 ring-violet-100">
+                      {current.role}
+                    </p>
                     <span
                       className={cn(
-                        "mt-3 rounded-full px-3 py-1 text-xs font-semibold",
+                        "mt-2 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
                         current.status === "active"
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-100 text-slate-600",
@@ -186,7 +196,7 @@ export function TeamProfileDrawer({
                 </div>
               ) : (
                 <>
-                  <dl className="mt-8 space-y-4 text-sm">
+                  <dl className="mt-6 space-y-3.5 text-sm">
                     <div className="flex gap-3">
                       <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       <div>
@@ -214,6 +224,28 @@ export function TeamProfileDrawer({
                         </dd>
                       </div>
                     </div>
+                    {current.gender ? (
+                      <div className="flex gap-3">
+                        <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                        <div>
+                          <dt className="text-xs text-slate-400">Gender</dt>
+                          <dd className="font-medium text-slate-800">
+                            {current.gender}
+                          </dd>
+                        </div>
+                      </div>
+                    ) : null}
+                    {current.birthday ? (
+                      <div className="flex gap-3">
+                        <Cake className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                        <div>
+                          <dt className="text-xs text-slate-400">Birthday</dt>
+                          <dd className="font-medium text-slate-800">
+                            {current.birthday}
+                          </dd>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="flex gap-3">
                       <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       <div>
@@ -236,7 +268,7 @@ export function TeamProfileDrawer({
                     </div>
                   </dl>
 
-                  <div className="mt-8">
+                  <div className="mt-6">
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Responsibilities
                     </h4>
@@ -252,7 +284,7 @@ export function TeamProfileDrawer({
                     </ul>
                   </div>
 
-                  <div className="mt-8">
+                  <div className="mt-6">
                     <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Activity History
                     </h4>
@@ -273,7 +305,7 @@ export function TeamProfileDrawer({
 
                   <Button
                     type="button"
-                    className="mt-8 w-full"
+                    className="mt-6 w-full"
                     onClick={startEdit}
                   >
                     <Pencil className="mr-2 h-4 w-4" />

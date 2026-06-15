@@ -8,16 +8,20 @@ import { cn } from "@/lib/utils";
 type TeamMemberAvatarProps = {
   name: string;
   image: string | null;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "card" | "lg" | "xl" | "profile";
   className?: string;
+  /** CSS object-position for photo crops, e.g. "center top". */
+  imagePosition?: string;
 };
 
-const sizes = {
-  sm: "h-10 w-10 text-xs",
-  md: "h-14 w-14 text-sm",
-  lg: "h-20 w-20 text-lg",
-  xl: "h-24 w-24 text-xl",
-};
+const sizeConfig = {
+  sm: { box: "h-10 w-10 text-xs", round: "rounded-full" },
+  md: { box: "h-14 w-14 text-sm", round: "rounded-full" },
+  card: { box: "h-[4.5rem] w-[4.5rem] text-sm", round: "rounded-2xl" },
+  lg: { box: "h-20 w-20 text-lg", round: "rounded-full" },
+  xl: { box: "h-24 w-24 text-xl", round: "rounded-full" },
+  profile: { box: "h-40 w-40 text-2xl", round: "rounded-2xl" },
+} as const;
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -30,13 +34,21 @@ export function TeamMemberAvatar({
   image,
   size = "md",
   className,
+  imagePosition = "center top",
 }: TeamMemberAvatarProps) {
-  if (image?.startsWith("data:") || image?.startsWith("http")) {
+  const { box, round } = sizeConfig[size];
+
+  if (
+    image?.startsWith("data:") ||
+    image?.startsWith("http") ||
+    image?.startsWith("/")
+  ) {
     return (
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-sm",
-          sizes[size],
+          "relative shrink-0 overflow-hidden bg-slate-100 ring-2 ring-violet-100/80 shadow-sm",
+          box,
+          round,
           className,
         )}
       >
@@ -44,7 +56,15 @@ export function TeamMemberAvatar({
           src={image}
           alt={name}
           fill
-          className="object-cover"
+          sizes={
+            size === "profile"
+              ? "160px"
+              : size === "card"
+                ? "72px"
+                : "96px"
+          }
+          className="object-cover [transform:translateZ(0)]"
+          style={{ objectPosition: imagePosition }}
           unoptimized={image.startsWith("data:")}
         />
       </div>
@@ -54,8 +74,9 @@ export function TeamMemberAvatar({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-bold text-white ring-2 ring-white shadow-sm",
-        sizes[size],
+        "flex shrink-0 items-center justify-center font-bold text-white ring-2 ring-violet-100/80 shadow-sm",
+        box,
+        round,
         className,
       )}
       style={{ background: avatarGradient(name) }}

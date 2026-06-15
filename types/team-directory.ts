@@ -11,10 +11,14 @@ export type TeamDirectoryMember = {
   /** Display designation (e.g. Operations Manager). */
   role: string;
   department: string;
+  gender?: string | null;
+  birthday?: string | null;
   status: TeamMemberStatus;
   joined_at: string;
   last_active_at: string | null;
   profile_image: string | null;
+  /** Fine-tune photo crop inside the avatar frame. */
+  profile_image_position?: string | null;
   responsibilities: string[];
   /** Portal team_role when synced from Supabase. */
   team_role?: TeamRole;
@@ -38,31 +42,17 @@ export type TeamDirectoryFilters = {
 
 export const TEAM_DEPARTMENTS = [
   "All Departments",
-  "Operations",
-  "Franchise Consulting",
-  "Brand Success",
-  "Sales & CRM",
+  "C Suite",
+  "Sales/Business Development",
+  "Human Resource",
   "Marketing",
-  "Content",
-  "Finance",
-  "Partnerships",
-  "Growth",
-  "Support",
 ] as const;
 
 export const TEAM_DESIGNATIONS = [
-  "Operations Manager",
-  "Franchise Consultant",
-  "Brand Success Manager",
-  "Lead Manager",
-  "Business Analyst",
-  "Marketing Manager",
-  "CRM Executive",
-  "Sales Manager",
-  "Support Executive",
-  "Content Manager",
-  "Finance Executive",
-  "Partnership Manager",
-  "Territory Manager",
-  "Growth Manager",
+  "Founder & Director",
+  "Cofounder",
+  "Business Development Associate",
+  "HR & Operations Executive",
+  "Website Developer Intern",
+  "Digital Marketing Specialist",
 ] as const;

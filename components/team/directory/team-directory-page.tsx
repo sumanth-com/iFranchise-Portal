@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, MailPlus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -24,7 +23,6 @@ import {
   mergeTeamDirectory,
 } from "@/lib/team/directory-data";
 import { formatRelativeTime } from "@/lib/format-date";
-import { staggerContainer } from "@/lib/motion";
 import { setTeamMemberActiveForm } from "@/lib/team/actions";
 import type { Profile } from "@/types/auth";
 import type { TeamDirectoryMember } from "@/types/team-directory";
@@ -189,18 +187,18 @@ export function TeamDirectoryPage({
   }
 
   return (
-    <div className="space-y-6 pb-10">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+    <div className="w-full space-y-6 pb-10">
+      <div className="flex w-full flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
             Organization
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Team Management
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-slate-500">
+          <p className="mt-2 max-w-3xl text-sm text-slate-500 sm:text-base">
             Manage your platform team members. View, edit, and control access
-            from one directory.
+            from one full-width directory.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -251,31 +249,34 @@ export function TeamDirectoryPage({
         }}
       />
 
-      <motion.div
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-        className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        {pageMembers.map((member) => (
-          <div key={member.id} className="h-full">
+      {filtered.length > 0 ? (
+        <p className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-800">{filtered.length}</span>{" "}
+          team member{filtered.length === 1 ? "" : "s"}
+        </p>
+      ) : null}
+
+      <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {pageMembers.length === 0 ? (
+          <p className="col-span-full py-14 text-center text-sm text-slate-400">
+            No team members match your filters.
+          </p>
+        ) : (
+          pageMembers.map((member, index) => (
             <TeamMemberCard
+              key={member.id}
               member={member}
+              index={index}
               onOpen={setDrawerMember}
               onMenuToggle={openMenu}
               menuOpen={menuMember?.id === member.id}
             />
-          </div>
-        ))}
-      </motion.div>
+          ))
+        )}
+      </div>
 
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-sm text-slate-400">
-          No team members match your filters.
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+      {filtered.length > 0 ? (
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:px-5">
         <p className="text-sm text-slate-500">
           Showing {(page - 1) * PAGE_SIZE + 1} to{" "}
           {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}{" "}
@@ -317,7 +318,8 @@ export function TeamDirectoryPage({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+        </div>
+      ) : null}
 
       <TeamActionMenu
         member={menuMember}

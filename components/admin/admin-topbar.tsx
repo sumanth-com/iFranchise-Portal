@@ -1,65 +1,76 @@
 "use client";
 
-import Link from "next/link";
-import { Bell, LogOut, Shield } from "lucide-react";
+import { usePathname } from "next/navigation";
 
-import { logout } from "@/lib/auth/actions";
+import { UserAvatar } from "@/components/dashboard/client/user-avatar";
+import { AdminNotificationBell } from "@/components/admin/admin-notification-bell";
 import { resolveFirstName } from "@/lib/utils";
+import type { AdminNotificationPreview } from "@/lib/notifications/types";
 
 type AdminTopbarProps = {
   userId: string;
   email: string;
   name?: string | null;
-  notificationCount?: number;
+  notifications?: AdminNotificationPreview[];
 };
 
+const PAGE_TITLES: Record<string, string> = {
+  "/admin": "Dashboard",
+  "/admin/reviews": "Review queue",
+  "/admin/brands": "All brands",
+  "/admin/notifications": "Notifications",
+  "/admin/leads": "Investor leads",
+  "/admin/admin-management": "Command center",
+  "/admin/team": "Team",
+};
+
+function resolvePageTitle(pathname: string): string {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  if (pathname.startsWith("/admin/brands/")) return "Brand review";
+  return "Marketplace admin";
+}
+
 export function AdminTopbar({
+  userId,
   email,
   name,
-  notificationCount = 0,
+  notifications = [],
 }: AdminTopbarProps) {
+  const pathname = usePathname();
   const displayName = resolveFirstName(name, email);
+  const pageTitle = resolvePageTitle(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">
-          <Shield className="h-4 w-4" />
-        </span>
-        <div className="hidden sm:block">
-          <p className="text-sm font-semibold text-slate-900">Admin Command Center</p>
-          <p className="text-xs text-slate-500">Brand review & publishing</p>
-        </div>
+    <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
+      <div className="min-w-0">
+        <p className="truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
+          {pageTitle}
+        </p>
+        <p className="hidden text-xs text-slate-500 sm:block">
+          iFranchise marketplace operations
+        </p>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4">
-        <Link
-          href="/admin/notifications"
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-          aria-label="Notifications"
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <AdminNotificationBell userId={userId} notifications={notifications} />
+
+        <div className="hidden h-6 w-px bg-slate-200 sm:block" aria-hidden />
+
+        <div
+          className="flex min-w-0 items-center gap-2"
+          title={email}
         >
-          <Bell className="h-4 w-4" />
-          {notificationCount > 0 ? (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-              {notificationCount > 9 ? "9+" : notificationCount}
-            </span>
-          ) : null}
-        </Link>
-
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-          <p className="text-xs text-slate-500">{email}</p>
+          <UserAvatar
+            userId={userId}
+            email={email}
+            name={name}
+            size="sm"
+            className="rounded-lg ring-1 ring-slate-200/80"
+          />
+          <span className="hidden max-w-[9rem] truncate text-sm font-medium text-slate-700 sm:inline">
+            {displayName}
+          </span>
         </div>
-
-        <form action={logout}>
-          <button
-            type="submit"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600"
-            aria-label="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </form>
       </div>
     </header>
   );

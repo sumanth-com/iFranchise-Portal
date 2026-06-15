@@ -1,4 +1,4 @@
-import { BrandTable } from "@/components/admin/BrandTable";
+import { BrandDirectory } from "@/components/admin/brands/brand-directory";
 import { requireAdmin } from "@/lib/auth/session";
 import { getAdminBrands } from "@/lib/admin/queries";
 import { ADMIN_PAGE_SIZE } from "@/types/admin";
@@ -47,7 +47,7 @@ export default async function AdminBrandsPage({ searchParams }: BrandsPageProps)
           All brands
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Browse every brand submission across all workflow stages.
+          Browse franchise listings in a visual directory — logos, owners, and workflow status at a glance.
         </p>
       </div>
 
@@ -60,7 +60,7 @@ export default async function AdminBrandsPage({ searchParams }: BrandsPageProps)
         </p>
       ) : null}
 
-      <BrandTable
+      <BrandDirectory
         brands={result.brands}
         statusFilter={params.status ?? ""}
         searchQuery={params.q ?? ""}
@@ -68,7 +68,6 @@ export default async function AdminBrandsPage({ searchParams }: BrandsPageProps)
         page={result.page}
         pageSize={result.pageSize}
         basePath="/admin/brands"
-        showQuickActions={false}
       />
     </div>
   );

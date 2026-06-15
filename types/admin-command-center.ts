@@ -1,6 +1,10 @@
 import type { ActivityLog } from "@/types/team";
 
-export type AdminDisplayRole = "admin" | "senior_admin" | "super_admin";
+export type AdminDisplayRole =
+  | "admin"
+  | "super_admin"
+  | "founder"
+  | "cofounder";
 
 export type AdminDirectoryStatus = "active" | "pending" | "suspended";
 

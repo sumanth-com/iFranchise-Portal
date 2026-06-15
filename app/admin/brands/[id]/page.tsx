@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { AdminBrandAssets } from "@/components/admin/admin-brand-assets";
 import { AdminBrandStatusBadge } from "@/components/admin/admin-brand-status-badge";
+import { BrandReviewStickySidebar } from "@/components/admin/brands/brand-review-sticky-sidebar";
 import { PublishActions } from "@/components/admin/PublishActions";
 import { ReviewActions } from "@/components/admin/ReviewActions";
 import { Card } from "@/components/ui/card";
@@ -71,9 +72,12 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
         Back to review queue
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-violet-100/80 bg-gradient-to-r from-violet-50/50 via-white to-white px-5 py-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-600">
+            Brand review
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {brand.business_name}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -84,7 +88,7 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
         <AdminBrandStatusBadge brand={brand} pulse={brand.status === "submitted"} />
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-5 xl:gap-8">
         <div className="space-y-6 xl:col-span-3">
           <AdminBrandAssets assets={assets} assetsError={assetsError} />
 
@@ -235,10 +239,10 @@ export default async function BrandReviewPage({ params }: BrandReviewPageProps) 
           ) : null}
         </div>
 
-        <div className="space-y-6 xl:col-span-2">
+        <BrandReviewStickySidebar>
           <ReviewActions brand={brand} />
           <PublishActions brand={brand} />
-        </div>
+        </BrandReviewStickySidebar>
       </div>
     </div>
   );

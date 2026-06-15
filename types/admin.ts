@@ -3,6 +3,7 @@ import type { Brand, BrandStatus } from "@/types/brand";
 export type AdminBrandListItem = {
   id: string;
   business_name: string;
+  tagline: string | null;
   industry: string | null;
   status: BrandStatus;
   created_at: string;
@@ -10,6 +11,7 @@ export type AdminBrandListItem = {
   published_at: string | null;
   owner_email: string;
   owner_name: string | null;
+  logo_url: string | null;
 };
 
 export type AdminBrandDetail = Brand & {

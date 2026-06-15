@@ -2,12 +2,9 @@
 
 import { motion } from "framer-motion";
 
-import { BrandTable } from "@/components/admin/BrandTable";
 import { DashboardActivityTimeline } from "@/components/admin/dashboard/dashboard-activity-timeline";
-import { DashboardAnalyticsGrid } from "@/components/admin/dashboard/dashboard-analytics-grid";
-import { DashboardCharts } from "@/components/admin/dashboard/dashboard-charts";
 import { DashboardHero } from "@/components/admin/dashboard/dashboard-hero";
-import { DashboardPerformanceSection } from "@/components/admin/dashboard/dashboard-performance";
+import { DashboardKpiStrip } from "@/components/admin/dashboard/dashboard-kpi-strip";
 import { DashboardPlatformPulse } from "@/components/admin/dashboard/dashboard-platform-pulse";
 import { fadeUp } from "@/lib/motion";
 import type { AdminDashboardData } from "@/types/admin-dashboard";
@@ -15,76 +12,62 @@ import type { AdminDashboardData } from "@/types/admin-dashboard";
 type AdminDashboardProps = {
   data: AdminDashboardData;
   adminName: string;
+  greeting: string;
+  todayLabel: string;
+  todayDateTime: string;
 };
 
-export function AdminDashboard({ data, adminName }: AdminDashboardProps) {
+export function AdminDashboard({
+  data,
+  adminName,
+  greeting,
+  todayLabel,
+  todayDateTime,
+}: AdminDashboardProps) {
   return (
-    <div className="w-full space-y-6 pb-8 lg:space-y-8">
+    <div className="w-full space-y-8 pb-8">
       {data.error ? (
         <motion.div
           {...fadeUp}
           role="alert"
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
         >
           {data.error}
         </motion.div>
       ) : null}
 
-      <DashboardHero adminName={adminName} hero={data.hero} />
-
-      <DashboardAnalyticsGrid analytics={data.analytics} />
-
-      <section className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
-            Intelligence
-          </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-            Growth & conversion analytics
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-5">
-          <div className="min-w-0 lg:col-span-8 xl:col-span-9">
-            <DashboardCharts charts={data.charts} showHeader={false} />
-          </div>
-          <div className="min-w-0 lg:col-span-4 xl:col-span-3">
-            <DashboardActivityTimeline
-              items={data.timeline}
-              className="lg:sticky lg:top-4"
-            />
-          </div>
-        </div>
-      </section>
-
-      <DashboardPlatformPulse
-        analytics={data.analytics}
+      <DashboardHero
+        adminName={adminName}
         hero={data.hero}
-        categories={data.charts.topCategories}
+        greeting={greeting}
+        todayLabel={todayLabel}
+        todayDateTime={todayDateTime}
       />
 
-      <DashboardPerformanceSection performance={data.performance} />
+      <DashboardKpiStrip
+        totalBrands={data.analytics.totalBrands}
+        pendingReviews={data.analytics.pendingBrands}
+        totalLeads={data.analytics.totalLeads}
+        teamMembers={{
+          value: data.hero.teamMembers,
+          changePercent: data.analytics.teamPerformance.changePercent,
+        }}
+      />
 
-      <motion.section {...fadeUp} className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">
-            Review queue
-          </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-            Pending applications
-          </h2>
+      <div className="grid items-start gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <DashboardPlatformPulse
+            analytics={data.analytics}
+            hero={data.hero}
+            categories={data.charts.topCategories}
+          />
         </div>
-        <BrandTable
-          brands={data.pendingQueue}
-          total={data.pendingTotal}
-          page={1}
-          pageSize={5}
-          basePath="/admin"
-          title="Awaiting your decision"
-          description="Brands submitted and ready for review."
-          pendingOnly
-          showQuickActions
+
+        <DashboardActivityTimeline
+          items={data.timeline.slice(0, 8)}
+          className="xl:sticky xl:top-4"
         />
-      </motion.section>
+      </div>
     </div>
   );
 }

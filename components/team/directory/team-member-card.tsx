@@ -1,113 +1,133 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Calendar, Mail, MoreVertical, Phone } from "lucide-react";
+import { Calendar, Clock, Mail, MoreVertical, Phone } from "lucide-react";
 
+import { TeamCardBanner } from "@/components/team/directory/team-card-banner";
 import { TeamMemberAvatar } from "@/components/team/directory/team-member-avatar";
 import { formatDate, formatRelativeTime } from "@/lib/format-date";
-import { staggerItem } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { TeamDirectoryMember } from "@/types/team-directory";
 
 type TeamMemberCardProps = {
   member: TeamDirectoryMember;
+  index: number;
   onOpen: (member: TeamDirectoryMember) => void;
   onMenuToggle: (member: TeamDirectoryMember, anchor: DOMRect) => void;
   menuOpen: boolean;
 };
 
+function ContactRow({
+  icon: Icon,
+  value,
+}: {
+  icon: typeof Mail;
+  value: string;
+}) {
+  return (
+    <div className="grid grid-cols-[1.75rem_1fr] items-center gap-x-2">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-violet-100">
+        <Icon className="h-3.5 w-3.5 text-violet-600" />
+      </span>
+      <span className="truncate text-left text-[11px] font-medium leading-tight text-slate-700">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function TeamMemberCard({
   member,
+  index,
   onOpen,
   onMenuToggle,
   menuOpen,
 }: TeamMemberCardProps) {
   return (
-    <motion.article
-      variants={staggerItem}
-      whileHover={{ y: -4 }}
-      transition={{ type: "spring", stiffness: 400, damping: 28 }}
-      className="group relative flex h-full min-h-[260px] flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-shadow hover:border-violet-200/80 hover:shadow-[0_12px_40px_rgba(124,58,237,0.08)]"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen(member)}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left"
-        >
-          <TeamMemberAvatar
-            name={member.full_name}
-            image={member.profile_image}
-            size="md"
-          />
-          <div className="min-w-0 pt-0.5">
-            <p className="truncate font-semibold text-slate-900">
-              {member.full_name}
-            </p>
-            <p className="truncate text-sm text-slate-500">{member.role}</p>
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            onMenuToggle(member, rect);
-          }}
-          className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700",
-            menuOpen && "bg-slate-100 text-slate-700",
-          )}
-          aria-label={`Actions for ${member.full_name}`}
-        >
-          <MoreVertical className="h-4 w-4" />
-        </button>
+    <article className="group relative isolate flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-[box-shadow,border-color] duration-200 hover:border-violet-200 hover:shadow-[0_12px_36px_rgba(124,58,237,0.1)]">
+      <TeamCardBanner
+        variantIndex={index}
+        department={member.department}
+        actions={
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              onMenuToggle(member, rect);
+            }}
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 text-white transition-colors hover:bg-white/25",
+              menuOpen && "bg-white/25",
+            )}
+            aria-label={`Actions for ${member.full_name}`}
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </button>
+        }
+      />
+
+      <div className="relative z-10 -mt-8 flex justify-center pb-0.5">
+        <TeamMemberAvatar
+          name={member.full_name}
+          image={member.profile_image}
+          size="card"
+          imagePosition={member.profile_image_position ?? "center top"}
+          className="ring-[3px] ring-white shadow-md"
+        />
       </div>
 
       <button
         type="button"
         onClick={() => onOpen(member)}
-        className="mt-4 flex flex-1 flex-col text-left"
+        className="flex flex-col px-3.5 pb-3.5 pt-1 text-left"
       >
-        <div className="space-y-2.5 text-sm text-slate-600">
-          <p className="flex items-center gap-2.5">
-            <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="truncate">{member.email}</span>
-          </p>
-          <p className="flex items-center gap-2.5">
-            <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="truncate">{member.phone}</span>
+        <h3 className="line-clamp-2 text-center text-sm font-semibold leading-snug text-slate-900">
+          {member.full_name}
+        </h3>
+
+        <div className="mt-2 rounded-lg border border-violet-100/80 bg-violet-50/70 px-2.5 py-1.5">
+          <p className="text-center text-[11px] font-semibold leading-snug text-violet-900">
+            {member.role}
           </p>
         </div>
 
-        <div className="mt-4 flex min-h-[28px] flex-wrap items-center gap-2">
+        <div className="mt-2.5 space-y-1.5 rounded-xl bg-slate-50/90 p-2 ring-1 ring-slate-100">
+          <ContactRow icon={Mail} value={member.email} />
+          <ContactRow icon={Phone} value={member.phone} />
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-[10px] text-slate-500">
+            <span className="flex min-w-0 items-center gap-1 truncate">
+              <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
+              {formatDate(member.joined_at) ?? "—"}
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="flex min-w-0 items-center gap-1 truncate">
+              <Clock className="h-3 w-3 shrink-0 text-slate-400" />
+              {member.last_active_at
+                ? formatRelativeTime(member.last_active_at) ?? "Recently"
+                : "Never"}
+            </span>
+          </div>
           <span
             className={cn(
-              "rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
               member.status === "active"
-                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10"
-                : "bg-slate-100 text-slate-600 ring-1 ring-slate-300/30",
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-600",
             )}
           >
-            {member.status === "active" ? "Active" : "Inactive"}
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                member.status === "active" ? "bg-emerald-500" : "bg-slate-400",
+              )}
+            />
+            {member.status === "active" ? "Active" : "Off"}
           </span>
-          <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-medium text-violet-700">
-            {member.department}
-          </span>
-        </div>
-
-        <div className="mt-auto border-t border-slate-100 pt-3 text-[11px] leading-relaxed text-slate-400">
-          <p className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3" />
-            Joined {formatDate(member.joined_at) ?? "—"}
-          </p>
-          <p className="mt-1">
-            Last active{" "}
-            {member.last_active_at
-              ? formatRelativeTime(member.last_active_at) ?? "Recently"
-              : "Never"}
-          </p>
         </div>
       </button>
-    </motion.article>
+    </article>
   );
 }

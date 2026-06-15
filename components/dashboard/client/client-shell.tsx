@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { ClientSidebar } from "@/components/dashboard/client/client-sidebar";
 import { ClientTopbar } from "@/components/dashboard/client/client-topbar";
+import { AuthSessionGuard } from "@/components/auth/auth-session-guard";
 import { MobileBottomNav } from "@/components/dashboard/client/mobile-bottom-nav";
 import { MobileDrawer } from "@/components/dashboard/client/mobile-drawer";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -47,6 +48,7 @@ export function ClientShell({
 
   return (
     <ToastProvider>
+      <AuthSessionGuard />
       <div
         data-dashboard="client"
         className="flex h-dvh overflow-hidden bg-[#F8FAFC] text-slate-900 dark:bg-slate-950 dark:text-slate-100"
@@ -55,6 +57,7 @@ export function ClientShell({
           <ClientSidebar
             groups={clientNavGroups}
             collapsed={collapsed}
+            userId={userId}
             onToggle={() => setCollapsed((v) => !v)}
           />
         </Suspense>
@@ -80,6 +83,7 @@ export function ClientShell({
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
             groups={clientNavGroups}
+            userId={userId}
           />
         </Suspense>
       </div>

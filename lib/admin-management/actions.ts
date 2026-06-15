@@ -4,11 +4,22 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import {
+  getAdminDependencies,
+  transferAdminOwnership,
+  type AdminDependencies,
+} from "@/lib/admin-management/admin-dependencies";
+import {
   adminRoleToPortalRole,
   adminRoleToTeamRole,
 } from "@/lib/admin-management/permissions-display";
+import {
+  ADMIN_PERMISSION_KEYS,
+} from "@/lib/admin-management/permission-keys";
 import { requireSuperAdmin } from "@/lib/auth/session";
 import { logActivity } from "@/lib/team/activity";
+import {
+  getAdminPermissions,
+} from "@/lib/admin-management/queries";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { AdminDisplayRole } from "@/types/admin-command-center";
@@ -18,6 +29,8 @@ import { initialTeamActionState } from "@/types/team";
 function revalidateAdminManagement() {
   revalidatePath("/admin/admin-management");
   revalidatePath("/admin/team");
+  revalidatePath("/admin/notifications");
+  revalidatePath("/admin");
 }
 
 async function getOrigin(): Promise<string> {
@@ -148,6 +161,18 @@ export async function inviteAdminAccount(
     metadata: { email, admin_role: adminRole, team_role: teamRole },
   });
 
+  await logActivity({
+    actorId: actor.id,
+    action: "admin.welcome_notification",
+    entityType: "invitation",
+    entityId: invitation.id,
+    metadata: {
+      email,
+      full_name: fullName,
+      message: `Welcome invitation sent to ${email}. They will receive setup instructions by email.`,
+    },
+  });
+
   revalidateAdminManagement();
 
   return {
@@ -166,6 +191,8 @@ export async function updateAdminAccount(
 
   const memberId = String(formData.get("memberId") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim() || null;
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const department = String(formData.get("department") ?? "").trim() || null;
 
   if (!memberId) {
     return { error: "Account ID is required.", message: null };
@@ -192,7 +219,7 @@ export async function updateAdminAccount(
 
   const { error } = await supabase
     .from("profiles")
-    .update({ full_name: fullName })
+    .update({ full_name: fullName, phone, department })
     .eq("id", memberId);
 
   if (error) {
@@ -204,7 +231,7 @@ export async function updateAdminAccount(
     action: "admin.updated",
     entityType: "profile",
     entityId: memberId,
-    metadata: { email: target.email, full_name: fullName },
+    metadata: { email: target.email, full_name: fullName, phone, department },
   });
 
   revalidateAdminManagement();
@@ -490,6 +517,131 @@ export async function revokeAdminInvitation(
   return { error: null, message: "Invitation revoked." };
 }
 
+export async function deleteAdminAccount(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const actor = await requireSuperAdmin();
+
+  const memberId = String(formData.get("memberId") ?? "").trim();
+  const transferToId = String(formData.get("transferToId") ?? "").trim() || null;
+
+  if (!memberId) {
+    return { error: "Account ID is required.", message: null };
+  }
+
+  if (memberId === actor.id) {
+    return { error: "You cannot delete your own account.", message: null };
+  }
+
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from("profiles")
+    .select("email, role, full_name")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (!member || member.role === "super_admin") {
+    return { error: "Only admin accounts can be deleted here.", message: null };
+  }
+
+  const deps = await getAdminDependencies(memberId);
+  if (deps.hasDependencies) {
+    if (!transferToId) {
+      return {
+        error: `This admin owns ${deps.reviewedBrands} brand review(s) and ${deps.assignedLeads} lead(s). Transfer ownership before deletion.`,
+        message: null,
+      };
+    }
+
+    const transfer = await transferAdminOwnership(memberId, transferToId);
+    if (transfer.error) {
+      return { error: transfer.error, message: null };
+    }
+  }
+
+  const serviceClient = createServiceClient();
+  if (!serviceClient) {
+    return {
+      error: "Account deletion requires SUPABASE_SERVICE_ROLE_KEY.",
+      message: null,
+    };
+  }
+
+  const { error: authError } = await serviceClient.auth.admin.deleteUser(memberId);
+  if (authError) {
+    return { error: authError.message, message: null };
+  }
+
+  await logActivity({
+    actorId: actor.id,
+    action: "admin.deleted",
+    entityType: "profile",
+    entityId: memberId,
+    metadata: {
+      email: member.email,
+      full_name: member.full_name,
+      transferred_to: transferToId,
+    },
+  });
+
+  revalidateAdminManagement();
+  return { error: null, message: "Administrator account deleted." };
+}
+
+export async function updateAdminPermissions(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const actor = await requireSuperAdmin();
+  const memberId = String(formData.get("memberId") ?? "").trim();
+
+  if (!memberId) {
+    return { error: "Account ID is required.", message: null };
+  }
+
+  const supabase = await createClient();
+  const updates = ADMIN_PERMISSION_KEYS.map((permission) => ({
+    profile_id: memberId,
+    permission,
+    enabled: formData.get(`perm_${permission}`) === "on",
+  }));
+
+  for (const row of updates) {
+    const { error } = await supabase.from("admin_permissions").upsert(row, {
+      onConflict: "profile_id,permission",
+    });
+    if (error) {
+      return { error: error.message, message: null };
+    }
+  }
+
+  await logActivity({
+    actorId: actor.id,
+    action: "admin.permissions_updated",
+    entityType: "profile",
+    entityId: memberId,
+    metadata: {
+      permissions: updates.filter((u) => u.enabled).map((u) => u.permission),
+    },
+  });
+
+  revalidateAdminManagement();
+  return { error: null, message: "Permissions updated." };
+}
+
+export async function getAdminDependenciesAction(
+  memberId: string,
+): Promise<AdminDependencies> {
+  await requireSuperAdmin();
+  return getAdminDependencies(memberId);
+}
+
+export async function getAdminPermissionsAction(memberId: string) {
+  await requireSuperAdmin();
+  return getAdminPermissions(memberId);
+}
+
 export const initialAdminManagementState = initialTeamActionState;
 
 export async function dispatchAdminDirectoryAction(
@@ -505,8 +657,9 @@ export async function dispatchAdminDirectoryAction(
     case "remove-invite":
       return revokeAdminInvitation(_prev, formData);
     case "remove-admin":
-      formData.set("isActive", "false");
-      return setAdminAccountActive(_prev, formData);
+      return deleteAdminAccount(_prev, formData);
+    case "delete":
+      return deleteAdminAccount(_prev, formData);
     case "resend":
       return resendAdminInvitation(_prev, formData);
     case "edit":

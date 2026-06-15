@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 type ClientSidebarProps = {
   groups: ClientNavGroup[];
   collapsed: boolean;
+  userId: string;
   onToggle: () => void;
 };
 
@@ -74,6 +75,7 @@ function NavLink({
 export function ClientSidebar({
   groups,
   collapsed,
+  userId,
   onToggle,
 }: ClientSidebarProps) {
   const pathname = usePathname();
@@ -123,7 +125,7 @@ export function ClientSidebar({
         ))}
       </nav>
 
-      <SidebarBrandFooter collapsed={collapsed} />
+      <SidebarBrandFooter collapsed={collapsed} userId={userId} />
     </aside>
   );
 }

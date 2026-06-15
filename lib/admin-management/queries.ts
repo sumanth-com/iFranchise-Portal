@@ -5,12 +5,15 @@ export type AdminAccount = {
   id: string;
   email: string;
   full_name: string | null;
+  phone: string | null;
+  department: string | null;
   role: "admin" | "super_admin";
   team_role: string | null;
   is_active: boolean;
   disabled_at: string | null;
   created_at: string;
   updated_at: string;
+  last_login_at: string | null;
 };
 
 export type AdminInvitation = {
@@ -30,7 +33,7 @@ export async function getAdminAccounts(): Promise<{
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, role, team_role, is_active, disabled_at, created_at, updated_at",
+      "id, email, full_name, phone, department, role, team_role, is_active, disabled_at, created_at, updated_at, last_login_at",
     )
     .in("role", ["admin", "super_admin"])
     .order("created_at", { ascending: false });
@@ -100,4 +103,21 @@ export async function getAdminManagementActivity(): Promise<{
   });
 
   return { logs, error: null };
+}
+
+export async function getAdminPermissions(profileId: string): Promise<{
+  permissions: { permission: string; enabled: boolean }[];
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("admin_permissions")
+    .select("permission, enabled")
+    .eq("profile_id", profileId);
+
+  if (error) {
+    return { permissions: [], error: error.message };
+  }
+
+  return { permissions: data ?? [], error: null };
 }

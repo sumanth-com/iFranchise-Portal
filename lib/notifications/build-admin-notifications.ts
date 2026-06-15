@@ -1,4 +1,5 @@
 import type { AdminBrandListItem } from "@/types/admin";
+import type { ActivityLog } from "@/types/team";
 
 import { buildAdminNotificationMessage } from "./admin-notification-message";
 import type { AdminNotification } from "./types";
@@ -7,12 +8,13 @@ type BuildAdminNotificationsOptions = {
   brands: AdminBrandListItem[];
   brandOwnerCount?: number;
   adminName?: string;
+  teamActivity?: ActivityLog[];
 };
 
 export function buildAdminNotifications(
   options: BuildAdminNotificationsOptions,
 ): AdminNotification[] {
-  const { brands, brandOwnerCount = 0, adminName = "Marketplace Admin" } =
+  const { brands, brandOwnerCount = 0, adminName = "Marketplace Admin", teamActivity = [] } =
     options;
   const items: AdminNotification[] = [];
 
@@ -70,6 +72,53 @@ export function buildAdminNotifications(
         adminName,
       }),
     });
+  }
+
+  for (const log of teamActivity) {
+    const meta = log.metadata ?? {};
+    const email = typeof meta.email === "string" ? meta.email : null;
+    const fullName =
+      typeof meta.full_name === "string" ? meta.full_name : null;
+
+    if (
+      log.action === "admin.invited" ||
+      log.action === "admin.welcome_notification"
+    ) {
+      items.push({
+        id: `team-${log.id}`,
+        category: "team_admin",
+        title:
+          log.action === "admin.welcome_notification"
+            ? "Welcome invitation sent"
+            : "Administrator invited",
+        description:
+          fullName && email
+            ? `${fullName} (${email}) was invited to the platform.`
+            : email
+              ? `Invitation sent to ${email}.`
+              : "A new administrator invitation was created.",
+        time: log.created_at,
+        href: "/admin/team",
+        message: buildAdminNotificationMessage({
+          category: "owner_activity",
+          adminName,
+          brandOwnerCount: 0,
+        }),
+      });
+    } else if (log.action === "admin.enabled") {
+      items.push({
+        id: `team-${log.id}`,
+        category: "team_admin",
+        title: "Administrator activated",
+        description: email ? `${email} is now active.` : "An admin account was activated.",
+        time: log.created_at,
+        href: "/admin/team",
+        message: buildAdminNotificationMessage({
+          category: "owner_activity",
+          adminName,
+        }),
+      });
+    }
   }
 
   return items.sort((a, b) => {

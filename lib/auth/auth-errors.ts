@@ -3,6 +3,7 @@ export const AUTH_ERROR_CODES = {
   profile: "profile",
   disabled: "disabled",
   unavailable: "unavailable",
+  expired: "expired",
 } as const;
 
 export type AuthErrorCode =
@@ -14,6 +15,7 @@ export const BLOCKING_AUTH_ERRORS = new Set<AuthErrorCode>([
   AUTH_ERROR_CODES.profile,
   AUTH_ERROR_CODES.disabled,
   AUTH_ERROR_CODES.unavailable,
+  AUTH_ERROR_CODES.expired,
 ]);
 
 export function isBlockingAuthError(
@@ -35,6 +37,8 @@ export function getAuthErrorMessage(error: string | null | undefined): string | 
       return "Your account is disabled. Contact an administrator.";
     case AUTH_ERROR_CODES.unavailable:
       return "Unable to connect to authentication service. Please try again.";
+    case AUTH_ERROR_CODES.expired:
+      return "Your session has expired. Please sign in again.";
     default:
       return null;
   }

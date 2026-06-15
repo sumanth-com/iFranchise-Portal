@@ -5,7 +5,11 @@ import {
   AUTH_ERROR_CODES,
   isBlockingAuthError,
 } from "@/lib/auth/auth-errors";
-import { hasSupabaseAuthCookies } from "@/lib/auth/cookies";
+import {
+  applyNoStoreHeaders,
+  clearSupabaseAuthCookies,
+  hasSupabaseAuthCookies,
+} from "@/lib/auth/cookies";
 import {
   AUTH_PATHS,
   getRedirectPathForRole,
@@ -18,6 +22,7 @@ import { isStaffRole } from "@/lib/auth/staff";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
 import { authDebug, authProfileTrace, isDisabledStaffGate } from "@/lib/auth/profile";
 import {
+  isInvalidSessionError,
   isServiceUnavailableError,
   resolveUserFromGetUser,
 } from "@/lib/auth/resolve-auth";
@@ -79,7 +84,14 @@ function redirectToLogin(
     loginUrl.searchParams.set("redirectTo", redirectTo);
   }
 
-  return NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect(loginUrl);
+  applyNoStoreHeaders(response);
+
+  if (error === AUTH_ERROR_CODES.expired || error === AUTH_ERROR_CODES.auth) {
+    clearSupabaseAuthCookies(request, response);
+  }
+
+  return response;
 }
 
 function redirectToApp(request: NextRequest, pathname: string) {
@@ -190,12 +202,17 @@ export async function updateSession(request: NextRequest) {
   }
 
   let user: { id: string } | null = null;
+  let sessionExpired = false;
 
   try {
     const {
       data: { user: authUser },
       error,
     } = await supabase.auth.getUser();
+
+    if (error && isInvalidSessionError(error)) {
+      sessionExpired = true;
+    }
 
     const resolved = resolveUserFromGetUser(authUser, error);
 
@@ -231,11 +248,13 @@ export async function updateSession(request: NextRequest) {
 
   // --- Unauthenticated ---
   if (!user) {
+    const loginError = sessionExpired ? AUTH_ERROR_CODES.expired : undefined;
+
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, undefined, pathname);
+      return redirectToLogin(request, loginError, pathname);
     }
     if (pathname === "/") {
-      return redirectToLogin(request);
+      return redirectToLogin(request, loginError);
     }
     return getResponse();
   }

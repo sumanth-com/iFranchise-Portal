@@ -1,6 +1,6 @@
 import { formatRelativeTime } from "@/lib/format-date";
 import type { TeamDirectoryMember, TeamDirectoryStats } from "@/types/team-directory";
-import type { TeamMember } from "@/types/team";
+import type { TeamMember, TeamInvitation } from "@/types/team";
 import { TEAM_ROLE_LABELS } from "@/types/team";
 
 const ROLE_TO_DESIGNATION: Partial<Record<string, string>> = {
@@ -186,9 +186,13 @@ export function mapTeamMemberToDirectory(member: TeamMember): TeamDirectoryMembe
       id: member.id,
       source: "supabase",
       team_role: member.team_role,
+      phone: member.phone?.trim() || roster.phone,
+      department: member.department?.trim() || roster.department,
       status: member.is_active ? "active" : "inactive",
       joined_at: member.created_at,
-      last_active_at: member.updated_at,
+      last_active_at: member.last_login_at ?? member.updated_at,
+      is_invitation: false,
+      invitation_id: null,
     };
   }
 
@@ -198,32 +202,71 @@ export function mapTeamMemberToDirectory(member: TeamMember): TeamDirectoryMembe
     id: member.id,
     full_name: member.full_name ?? member.email,
     email: member.email,
-    phone: "—",
+    phone: member.phone?.trim() || "—",
     role: designation,
-    department: ROLE_TO_DEPARTMENT[member.team_role] ?? "Operations",
+    department:
+      member.department?.trim() ||
+      ROLE_TO_DEPARTMENT[member.team_role] ||
+      "Operations",
     status: member.is_active ? "active" : "inactive",
     joined_at: member.created_at,
-    last_active_at: member.updated_at,
+    last_active_at: member.last_login_at ?? member.updated_at,
     profile_image: null,
     responsibilities: [`${TEAM_ROLE_LABELS[member.team_role]} portal access`],
     team_role: member.team_role,
     source: "supabase",
+    is_invitation: false,
+    invitation_id: null,
+  };
+}
+
+export function mapInvitationToDirectory(
+  invitation: TeamInvitation,
+): TeamDirectoryMember {
+  const designation =
+    ROLE_TO_DESIGNATION[invitation.team_role] ??
+    TEAM_ROLE_LABELS[invitation.team_role];
+
+  return {
+    id: `inv-${invitation.id}`,
+    full_name: invitation.email.split("@")[0],
+    email: invitation.email,
+    phone: "—",
+    role: designation,
+    department: ROLE_TO_DEPARTMENT[invitation.team_role] ?? "Operations",
+    status: "inactive",
+    joined_at: invitation.created_at,
+    last_active_at: null,
+    profile_image: null,
+    responsibilities: ["Pending invitation — awaiting password setup"],
+    team_role: invitation.team_role,
+    source: "supabase",
+    is_invitation: true,
+    invitation_id: invitation.id,
   };
 }
 
 export function mergeTeamDirectory(
   supabaseMembers: TeamMember[],
+  pendingInvitations: TeamInvitation[] = [],
 ): TeamDirectoryMember[] {
   const supabaseEmails = new Set(
     supabaseMembers.map((member) => member.email.toLowerCase()),
   );
 
+  const fromInvites = pendingInvitations
+    .filter((inv) => !supabaseEmails.has(inv.email.toLowerCase()))
+    .map(mapInvitationToDirectory);
   const fromSupabase = supabaseMembers.map(mapTeamMemberToDirectory);
   const rosterOnly = IFRANCHISE_TEAM_ROSTER.filter(
     (member) => !supabaseEmails.has(member.email.toLowerCase()),
-  );
+  ).map((member) => ({
+    ...member,
+    is_invitation: false,
+    invitation_id: null,
+  }));
 
-  return [...fromSupabase, ...rosterOnly].sort((a, b) => {
+  return [...fromInvites, ...fromSupabase, ...rosterOnly].sort((a, b) => {
     const deptOrder = (d: string) => {
       if (d === "C Suite") return 0;
       return 1;

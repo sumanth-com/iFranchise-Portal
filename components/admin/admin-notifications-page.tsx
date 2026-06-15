@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
   RefreshCw,
   Send,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +33,7 @@ const CATEGORY_ICONS: Record<AdminNotificationCategory, LucideIcon> = {
   new_submission: Send,
   resubmission: RefreshCw,
   owner_activity: Building2,
+  team_admin: Users,
 };
 
 const CATEGORY_STYLES: Record<
@@ -52,6 +54,11 @@ const CATEGORY_STYLES: Record<
     badge: "bg-violet-50 text-violet-700 ring-violet-100",
     icon: "bg-violet-100 text-violet-700",
     ring: "ring-violet-200/80",
+  },
+  team_admin: {
+    badge: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    icon: "bg-indigo-100 text-indigo-700",
+    ring: "ring-indigo-200/80",
   },
 };
 

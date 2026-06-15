@@ -12,6 +12,7 @@ import {
   getAuthErrorMessage,
 } from "@/lib/auth/auth-errors";
 import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
+import { touchLastLogin } from "@/lib/auth/touch-last-login";
 import {
   humanizeAuthError,
   profileLoadErrorMessage,
@@ -145,6 +146,10 @@ export async function login(
     }
 
     const destination = resolveRedirectPath(profile.role, redirectTo);
+
+    if (profile.role === "admin" || profile.role === "super_admin") {
+      await touchLastLogin(data.user.id, supabase);
+    }
 
     authDebug("login-redirect", {
       userId: data.user.id,
@@ -345,11 +350,7 @@ export async function repairAccount(
 }
 
 export async function logout() {
-  const supabase = await createClientOptional();
-  if (supabase) {
-    await supabase.auth.signOut();
-  }
-  redirect("/login");
+  redirect("/api/auth/logout");
 }
 
 export type CallbackExchangeResult =
@@ -406,6 +407,11 @@ export async function exchangeCallbackCode(
     }
 
     const redirectTo = resolveRedirectPath(profile.role, next);
+
+    if (profile.role === "admin" || profile.role === "super_admin") {
+      await touchLastLogin(user.id, supabase);
+    }
+
     authDebug("callback-code-exchange-ok", {
       userId: user.id,
       profileId: profile.id,

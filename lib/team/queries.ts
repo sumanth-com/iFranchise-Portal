@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ActivityLog, TeamInvitation, TeamMember } from "@/types/team";
 
 const MEMBER_FIELDS =
-  "id, email, full_name, team_role, is_active, disabled_at, created_at, updated_at";
+  "id, email, full_name, team_role, role, phone, department, is_active, disabled_at, created_at, updated_at, last_login_at";
 
 export async function getStaffProfile(userId: string) {
   const supabase = await createClient();
@@ -23,7 +23,7 @@ export async function getTeamMembers(): Promise<{
   const { data, error } = await supabase
     .from("profiles")
     .select(MEMBER_FIELDS)
-    .eq("role", "admin")
+    .in("role", ["admin", "super_admin"])
     .not("team_role", "is", null)
     .order("created_at", { ascending: false });
 

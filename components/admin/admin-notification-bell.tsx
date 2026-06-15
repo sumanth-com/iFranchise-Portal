@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Building2, RefreshCw, Send } from "lucide-react";
+import { Bell, Building2, RefreshCw, Send, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -22,6 +22,7 @@ const CATEGORY_ICONS: Record<AdminNotificationCategory, LucideIcon> = {
   new_submission: Send,
   resubmission: RefreshCw,
   owner_activity: Building2,
+  team_admin: Users,
 };
 
 type AdminNotificationBellProps = {

@@ -5,7 +5,7 @@ import { LogOut } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
-import { logout } from "@/lib/auth/actions";
+import { LogoutControl } from "@/components/auth/logout-control";
 import { usePortalProfile } from "@/lib/profile/use-portal-profile";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +90,7 @@ export function ClientUserMenu({
                   Brand Owner
                 </span>
               </div>
-              <form action={logout} className="p-3">
+              <LogoutControl userId={userId} className="p-3">
                 <button
                   type="submit"
                   className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
@@ -98,7 +98,7 @@ export function ClientUserMenu({
                   <LogOut className="h-4 w-4" />
                   Logout
                 </button>
-              </form>
+              </LogoutControl>
             </motion.div>
           </>
         ) : null}

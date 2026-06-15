@@ -1,38 +1,45 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { inviteTeamMember } from "@/lib/team/actions";
-import { getRoleDescription } from "@/lib/team/permissions";
-import { TEAM_ROLE_LABELS, initialTeamActionState, type TeamRole } from "@/types/team";
+import {
+  initialAdminManagementState,
+  inviteAdminAccount,
+} from "@/lib/admin-management/actions";
+import { ADMIN_INVITE_ROLES } from "@/lib/admin-management/permissions-display";
+import { useSafeRouterRefresh } from "@/lib/navigation/safe-router-refresh";
+import type { TeamRole } from "@/types/team";
 
 type InviteTeamModalProps = {
   open: boolean;
   onClose: () => void;
-  assignableRoles: TeamRole[];
+  assignableRoles?: TeamRole[];
 };
 
 export function InviteTeamModal({
   open,
   onClose,
-  assignableRoles,
 }: InviteTeamModalProps) {
+  const refresh = useSafeRouterRefresh();
+  const handledMessageRef = useRef<string | null>(null);
   const [state, formAction, isPending] = useActionState(
-    inviteTeamMember,
-    initialTeamActionState,
+    inviteAdminAccount,
+    initialAdminManagementState,
   );
 
   useEffect(() => {
-    if (state.message && !state.error) {
-      onClose();
-    }
-  }, [state.message, state.error, onClose]);
+    if (!state.message || state.error) return;
+    if (handledMessageRef.current === state.message) return;
+    handledMessageRef.current = state.message;
+    onClose();
+    refresh();
+  }, [state.message, state.error, onClose, refresh]);
 
   return (
     <AnimatePresence>
@@ -56,10 +63,11 @@ export function InviteTeamModal({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">
-                  Invite team member
+                  Invite administrator
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Send an email invitation with an assigned role.
+                  Creates a real account, sends an email invitation, and adds
+                  them to Team Hub instantly.
                 </p>
               </div>
               <button
@@ -81,42 +89,52 @@ export function InviteTeamModal({
                   name="email"
                   type="email"
                   required
-                  placeholder="colleague@company.com"
+                  placeholder="admin@company.com"
                   disabled={isPending}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="invite-name">Full name (optional)</Label>
+                <Label htmlFor="invite-name">Full name</Label>
                 <Input
                   id="invite-name"
                   name="fullName"
                   type="text"
+                  required
                   placeholder="Jane Smith"
                   disabled={isPending}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="invite-role">Role</Label>
+                <Label htmlFor="invite-phone">Phone (optional)</Label>
+                <Input
+                  id="invite-phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  disabled={isPending}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invite-role">Access level</Label>
                 <select
                   id="invite-role"
-                  name="teamRole"
+                  name="adminRole"
                   required
                   disabled={isPending}
+                  defaultValue="admin"
                   className="h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm outline-none focus:border-primary-500 focus:shadow-[var(--shadow-focus)]"
-                  defaultValue={assignableRoles[assignableRoles.length - 1]}
                 >
-                  {assignableRoles.map((role) => (
-                    <option key={role} value={role}>
-                      {TEAM_ROLE_LABELS[role]}
+                  {ADMIN_INVITE_ROLES.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-slate-500">
-                  {getRoleDescription(
-                    assignableRoles[assignableRoles.length - 1] ?? "support",
-                  )}
+                  {ADMIN_INVITE_ROLES[0]?.description}
                 </p>
               </div>
 
@@ -131,7 +149,7 @@ export function InviteTeamModal({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isPending} className="flex-1">
-                  {isPending ? "Sending..." : "Send invite"}
+                  {isPending ? "Sending…" : "Send invitation"}
                 </Button>
               </div>
             </form>

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 type AdminSidebarProps = {
   groups: ClientNavGroup[];
   collapsed: boolean;
+  userId: string;
   onToggle: () => void;
 };
 
@@ -67,7 +68,12 @@ function NavLink({
   );
 }
 
-export function AdminSidebar({ groups, collapsed, onToggle }: AdminSidebarProps) {
+export function AdminSidebar({
+  groups,
+  collapsed,
+  userId,
+  onToggle,
+}: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -103,7 +109,7 @@ export function AdminSidebar({ groups, collapsed, onToggle }: AdminSidebarProps)
         ))}
       </nav>
 
-      <SidebarBrandFooter collapsed={collapsed} />
+      <SidebarBrandFooter collapsed={collapsed} userId={userId} />
     </aside>
   );
 }

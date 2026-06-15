@@ -20,12 +20,14 @@ type LoginPageProps = {
   searchParams: Promise<{
     redirectTo?: string;
     error?: string;
+    logged_out?: string;
   }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const redirectTo = params.redirectTo;
+  const loggedOut = params.logged_out === "1";
   const envStatus = getSupabaseEnvStatus();
 
   if (isDevAutoLoginEnabled()) {
@@ -108,6 +110,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       envConfigured
       hasSession={Boolean(user)}
       hasProfile={Boolean(profile)}
+      loggedOutMessage={
+        loggedOut ? "You have been signed out successfully." : null
+      }
     />
   );
 }

@@ -46,6 +46,12 @@ export type OperationsDashboardData = {
     totalLeads: OperationsKpi;
     totalAdmins: OperationsKpi;
   };
+  adminStats: {
+    totalAdmins: number;
+    activeAdmins: number;
+    pendingInvitations: number;
+    suspendedAdmins: number;
+  };
   activity: OperationsActivityItem[];
   pendingReviews: AdminBrandListItem[];
   directory: AdminDirectoryRow[];

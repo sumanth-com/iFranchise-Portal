@@ -12,10 +12,14 @@ export type TeamMember = {
   email: string;
   full_name: string | null;
   team_role: TeamRole;
+  role?: "admin" | "super_admin" | "client";
+  phone?: string | null;
+  department?: string | null;
   is_active: boolean;
   disabled_at: string | null;
   created_at: string;
   updated_at: string;
+  last_login_at?: string | null;
 };
 
 export type TeamInvitation = {

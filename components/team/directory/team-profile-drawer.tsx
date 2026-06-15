@@ -30,6 +30,7 @@ type TeamProfileDrawerProps = {
   member: TeamDirectoryMember | null;
   onClose: () => void;
   onSave: (member: TeamDirectoryMember) => void;
+  canEdit?: boolean;
   activity: { id: string; label: string; time: string }[];
 };
 
@@ -37,6 +38,7 @@ export function TeamProfileDrawer({
   member,
   onClose,
   onSave,
+  canEdit = false,
   activity,
 }: TeamProfileDrawerProps) {
   const [editing, setEditing] = useState(false);
@@ -45,7 +47,7 @@ export function TeamProfileDrawer({
   const current = editing && draft ? draft : member;
 
   function startEdit() {
-    if (!member) return;
+    if (!member || !canEdit) return;
     setDraft({ ...member });
     setEditing(true);
   }
@@ -307,9 +309,10 @@ export function TeamProfileDrawer({
                     type="button"
                     className="mt-6 w-full"
                     onClick={startEdit}
+                    disabled={!canEdit}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Edit Profile
+                    {canEdit ? "Edit Profile" : "View only"}
                   </Button>
                 </>
               )}

@@ -13,12 +13,15 @@ import {
 import { createPortal } from "react-dom";
 
 import { ConfirmDialog } from "@/components/admin-command-center/confirm-dialog";
+import { AdminDeleteTransferDialog } from "@/components/admin-command-center/admin-delete-transfer-dialog";
+import { AdminPermissionsModal } from "@/components/admin-command-center/admin-permissions-modal";
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   dispatchAdminDirectoryAction,
+  getAdminPermissionsAction,
   initialAdminManagementState,
   inviteAdminAccount,
 } from "@/lib/admin-management/actions";
@@ -38,7 +41,6 @@ type OperationsAdminPanelProps = {
 type ConfirmAction =
   | { type: "suspend"; row: AdminDirectoryRow }
   | { type: "activate"; row: AdminDirectoryRow }
-  | { type: "remove"; row: AdminDirectoryRow }
   | { type: "resend"; row: AdminDirectoryRow }
   | null;
 
@@ -73,10 +75,12 @@ function RowMenu({
       ]
     : [
         { id: "edit", label: "Edit admin" },
+        { id: "permissions", label: "Permissions" },
+        { id: "reset", label: "Reset password" },
         ...(row.is_active
           ? [{ id: "suspend", label: "Suspend", danger: true }]
           : [{ id: "activate", label: "Activate" }]),
-        { id: "remove", label: "Remove admin", danger: true, disabled: isSelf },
+        { id: "remove", label: "Delete account", danger: true, disabled: isSelf },
       ];
 
   function closeMenu() {
@@ -209,7 +213,15 @@ export function OperationsAdminPanel({
     ADMIN_INVITE_ROLES.find((role) => role.value === inviteRole)?.description ??
     "";
   const [confirm, setConfirm] = useState<ConfirmAction>(null);
+  const [deleteRow, setDeleteRow] = useState<AdminDirectoryRow | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [editRow, setEditRow] = useState<AdminDirectoryRow | null>(null);
+  const [permissionsRow, setPermissionsRow] = useState<AdminDirectoryRow | null>(
+    null,
+  );
+  const [permissionRows, setPermissionRows] = useState<
+    { permission: string; enabled: boolean }[]
+  >([]);
   const [isPending, startTransition] = useTransition();
 
   const [inviteState, inviteAction, inviting] = useActionState(
@@ -235,18 +247,68 @@ export function OperationsAdminPanel({
     if (actionState.message && !actionState.error) {
       setConfirm(null);
       setEditRow(null);
+      setDeleteRow(null);
+      setDeleteLoading(false);
+    }
+    if (actionState.error) {
+      setDeleteLoading(false);
     }
   }, [actionState.message, actionState.error]);
+
+  const transferCandidates = useMemo(
+    () =>
+      rows
+        .filter((r) => !r.isInvitation && r.id !== deleteRow?.id)
+        .map((r) => ({
+          id: r.id,
+          label: r.full_name ?? r.email,
+        })),
+    [rows, deleteRow?.id],
+  );
 
   function handleAction(action: string, row: AdminDirectoryRow) {
     if (action === "edit") {
       setEditRow(row);
       return;
     }
+    if (action === "permissions" && !row.isInvitation) {
+      void getAdminPermissionsAction(row.id).then(({ permissions }) => {
+        setPermissionRows(permissions);
+        setPermissionsRow(row);
+      });
+      return;
+    }
+    if (action === "reset" && !row.isInvitation) {
+      const fd = new FormData();
+      fd.set("intent", "reset");
+      fd.set("memberId", row.id);
+      startTransition(() => runAction(fd));
+      return;
+    }
     if (action === "suspend") setConfirm({ type: "suspend", row });
     else if (action === "activate") setConfirm({ type: "activate", row });
-    else if (action === "remove") setConfirm({ type: "remove", row });
-    else if (action === "resend") setConfirm({ type: "resend", row });
+    else if (action === "remove") {
+      if (row.isInvitation) {
+        const fd = new FormData();
+        fd.set("intent", "remove-invite");
+        fd.set("invitationId", row.invitationId ?? "");
+        startTransition(() => runAction(fd));
+      } else {
+        setDeleteRow(row);
+      }
+    } else if (action === "resend") setConfirm({ type: "resend", row });
+  }
+
+  function executeDelete(transferToId: string | null) {
+    if (!deleteRow) return;
+    const fd = new FormData();
+    fd.set("intent", "delete");
+    fd.set("memberId", deleteRow.id);
+    if (transferToId) fd.set("transferToId", transferToId);
+    setDeleteLoading(true);
+    startTransition(() => {
+      runAction(fd);
+    });
   }
 
   function executeConfirm() {
@@ -264,15 +326,6 @@ export function OperationsAdminPanel({
         fd.set("memberId", row.id);
         fd.set("isActive", "true");
         break;
-      case "remove":
-        if (row.isInvitation && row.invitationId) {
-          fd.set("intent", "remove-invite");
-          fd.set("invitationId", row.invitationId);
-        } else {
-          fd.set("intent", "remove-admin");
-          fd.set("memberId", row.id);
-        }
-        break;
       case "resend":
         fd.set("intent", "resend");
         fd.set("invitationId", row.invitationId ?? "");
@@ -285,7 +338,7 @@ export function OperationsAdminPanel({
     <motion.section
       id="admins"
       {...fadeUp}
-      className="scroll-mt-20 rounded-2xl border border-violet-100/80 bg-white shadow-sm ring-1 ring-violet-50"
+      className="scroll-mt-20 w-full rounded-2xl border border-violet-100/80 bg-white shadow-sm ring-1 ring-violet-50"
     >
       <div className="border-b border-violet-100/80 bg-gradient-to-r from-violet-50/80 via-white to-purple-50/40 p-6 sm:p-8">
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-600">
@@ -301,104 +354,136 @@ export function OperationsAdminPanel({
           platform owner role — keep that for yourself only.
         </p>
 
-        <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+        <div className="mt-5 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-sm font-semibold text-slate-900">
             Invite team member
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
             Most invites should be <span className="font-medium">Admin</span> —
             they join as team members with day-to-day access.
           </p>
-          <form action={inviteAction} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="ops-name">Full name</Label>
-              <Input id="ops-name" name="fullName" required placeholder="Jane Smith" disabled={inviting} />
+          <form action={inviteAction} className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12 xl:items-end">
+              <div className="space-y-1.5 xl:col-span-3">
+                <Label htmlFor="ops-name">Full name</Label>
+                <Input
+                  id="ops-name"
+                  name="fullName"
+                  required
+                  placeholder="Jane Smith"
+                  disabled={inviting}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-1.5 xl:col-span-3">
+                <Label htmlFor="ops-email">Email</Label>
+                <Input
+                  id="ops-email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="admin@company.com"
+                  disabled={inviting}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-1.5 xl:col-span-3">
+                <Label htmlFor="ops-role">Access level</Label>
+                <select
+                  id="ops-role"
+                  name="adminRole"
+                  value={inviteRole}
+                  onChange={(e) =>
+                    setInviteRole(e.target.value as "admin" | "super_admin")
+                  }
+                  disabled={inviting}
+                  className="h-11 w-full rounded-xl border border-border-strong bg-white px-3 text-sm outline-none focus:border-primary-500 focus:shadow-[var(--shadow-focus)]"
+                >
+                  {ADMIN_INVITE_ROLES.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2 xl:col-span-3">
+                <Button
+                  type="submit"
+                  disabled={inviting}
+                  className="h-11 w-full"
+                >
+                  <UserPlus className="mr-1.5 h-4 w-4 shrink-0" />
+                  {inviting ? "Sending…" : "Send invite"}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ops-email">Email</Label>
-              <Input id="ops-email" name="email" type="email" required placeholder="admin@company.com" disabled={inviting} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ops-role">Access level</Label>
-              <select
-                id="ops-role"
-                name="adminRole"
-                value={inviteRole}
-                onChange={(e) =>
-                  setInviteRole(e.target.value as "admin" | "super_admin")
-                }
-                disabled={inviting}
-                className="h-11 w-full rounded-xl border border-border-strong bg-white px-3 text-sm"
-              >
-                {ADMIN_INVITE_ROLES.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                {inviteRoleHelp}
-              </p>
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" disabled={inviting} className="w-full">
-                <UserPlus className="mr-1.5 h-4 w-4" />
-                {inviting ? "Sending..." : "Send invite"}
-              </Button>
-            </div>
+            <p className="text-[11px] leading-relaxed text-slate-500">
+              {inviteRoleHelp}
+            </p>
+            <AuthAlert error={inviteState.error} message={inviteState.message} />
           </form>
-          <AuthAlert error={inviteState.error} message={inviteState.message} />
         </div>
 
-        <div className="relative mt-4 w-full max-w-xl sm:max-w-2xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search admins..."
-            className="pl-10"
-          />
-        </div>
-        <div className="mt-3">
+        <div className="mt-5 space-y-3">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search admins…"
+              className="h-11 pl-10"
+            />
+          </div>
           <AuthAlert error={actionState.error} message={actionState.message} />
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-6 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-6 py-3 text-right">Actions</th>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-6 py-3.5 sm:px-8">Name</th>
+              <th className="px-4 py-3.5">Email</th>
+              <th className="px-4 py-3.5">Role</th>
+              <th className="px-4 py-3.5">Status</th>
+              <th className="px-4 py-3.5">Created</th>
+              <th className="px-6 py-3.5 text-right sm:px-8">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
-                  No administrators found.
+                <td
+                  colSpan={6}
+                  className="px-6 py-16 text-center sm:px-8"
+                >
+                  <p className="text-sm font-medium text-slate-500">
+                    No administrators found
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Invite your first admin using the form above.
+                  </p>
                 </td>
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                  <td className="px-6 py-3.5 font-medium text-slate-900">
+                <tr
+                  key={row.id}
+                  className="border-b border-slate-50 transition-colors hover:bg-slate-50/60"
+                >
+                  <td className="px-6 py-3.5 font-medium text-slate-900 sm:px-8">
                     {row.full_name ?? "—"}
                   </td>
                   <td className="px-4 py-3.5 text-slate-600">{row.email}</td>
                   <td className="px-4 py-3.5">
-                    <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                    <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
                       {row.displayRoleLabel}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
                         row.status === "active" && "bg-emerald-50 text-emerald-700",
                         row.status === "pending" && "bg-amber-50 text-amber-700",
                         row.status === "suspended" && "bg-rose-50 text-rose-700",
@@ -414,12 +499,14 @@ export function OperationsAdminPanel({
                   <td className="px-4 py-3.5 text-slate-500">
                     {formatDate(row.created_at) ?? "—"}
                   </td>
-                  <td className="relative px-6 py-3.5 text-right">
-                    <RowMenu
-                      row={row}
-                      currentUserId={currentUserId}
-                      onAction={handleAction}
-                    />
+                  <td className="relative px-6 py-3.5 text-right sm:px-8">
+                    <div className="flex justify-end">
+                      <RowMenu
+                        row={row}
+                        currentUserId={currentUserId}
+                        onAction={handleAction}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))
@@ -435,21 +522,15 @@ export function OperationsAdminPanel({
             ? "Suspend admin?"
             : confirm?.type === "activate"
               ? "Activate admin?"
-              : confirm?.type === "resend"
-                ? "Resend invitation?"
-                : "Remove admin?"
+              : "Resend invitation?"
         }
         description={
           confirm
             ? `${confirm.row.email} — this action takes effect immediately.`
             : ""
         }
-        confirmLabel={confirm?.type === "remove" ? "Remove" : "Confirm"}
-        variant={
-          confirm?.type === "remove" || confirm?.type === "suspend"
-            ? "danger"
-            : "primary"
-        }
+        confirmLabel="Confirm"
+        variant={confirm?.type === "suspend" ? "danger" : "primary"}
         loading={actionLoading || isPending}
         onConfirm={executeConfirm}
         onClose={() => setConfirm(null)}
@@ -489,6 +570,27 @@ export function OperationsAdminPanel({
           </div>
         </>
       ) : null}
+
+      <AdminDeleteTransferDialog
+        open={deleteRow !== null}
+        adminId={deleteRow?.id ?? null}
+        adminLabel={deleteRow?.full_name ?? deleteRow?.email ?? ""}
+        transferCandidates={transferCandidates}
+        loading={deleteLoading || actionLoading}
+        onConfirm={executeDelete}
+        onClose={() => setDeleteRow(null)}
+      />
+
+      <AdminPermissionsModal
+        memberId={permissionsRow?.id ?? null}
+        memberLabel={permissionsRow?.full_name ?? permissionsRow?.email ?? ""}
+        teamRole={permissionsRow?.teamRole ?? null}
+        initialPermissions={permissionRows}
+        onClose={() => {
+          setPermissionsRow(null);
+          setPermissionRows([]);
+        }}
+      />
     </motion.section>
   );
 }

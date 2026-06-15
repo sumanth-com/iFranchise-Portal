@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { AuthLoadingScreen } from "@/components/auth/auth-loading-screen";
 import { exchangeCallbackCode } from "@/lib/auth/actions";
 import { isSafeRedirectPath } from "@/lib/auth/paths";
 import { createClientOptional } from "@/lib/supabase/client";
@@ -89,8 +90,9 @@ export function AuthCallbackHandler() {
   }, [searchParams]);
 
   return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 text-center">
-      <p className="text-sm text-slate-600">{status}</p>
-    </div>
+    <AuthLoadingScreen
+      message={status}
+      className="flex min-h-[60dvh] w-full flex-col items-center justify-center gap-6 px-6 py-12"
+    />
   );
 }

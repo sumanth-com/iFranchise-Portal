@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
 
-import { logout } from "@/lib/auth/actions";
+import { LogoutControl } from "@/components/auth/logout-control";
 import { cn } from "@/lib/utils";
 
 type UserMenuProps = {
@@ -82,7 +82,7 @@ export function UserMenu({
             >
               {email}
             </p>
-            <form action={logout}>
+            <LogoutControl>
               <button
                 type="submit"
                 className={cn(
@@ -93,7 +93,7 @@ export function UserMenu({
                 <LogOut className="h-4 w-4" />
                 Sign out
               </button>
-            </form>
+            </LogoutControl>
           </motion.div>
         </>
       ) : null}

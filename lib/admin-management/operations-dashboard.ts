@@ -55,7 +55,7 @@ function buildDirectoryRows(): Promise<{
         id: admin.id,
         email: admin.email,
         full_name: admin.full_name,
-        phone: null,
+        phone: admin.phone,
         portalRole: admin.role,
         teamRole: admin.team_role,
         displayRole,
@@ -65,7 +65,7 @@ function buildDirectoryRows(): Promise<{
         invitationId: null,
         is_active: admin.is_active,
         created_at: admin.created_at,
-        lastSignInAt: null,
+        lastSignInAt: admin.last_login_at,
       };
     });
 
@@ -153,6 +153,51 @@ function mergeActivity(
         type: "admin_created",
         title: "Admin activated",
         description: email ?? "Administrator account enabled",
+        timestamp: log.created_at,
+        href: "#admins",
+      });
+    } else if (log.action === "admin.updated") {
+      items.push({
+        id: log.id,
+        type: "admin_created",
+        title: "Admin updated",
+        description: email ?? "Administrator profile updated",
+        timestamp: log.created_at,
+        href: "#admins",
+      });
+    } else if (log.action === "admin.role_changed") {
+      items.push({
+        id: log.id,
+        type: "admin_created",
+        title: "Admin role changed",
+        description: email ?? "Administrator role updated",
+        timestamp: log.created_at,
+        href: "#admins",
+      });
+    } else if (log.action === "admin.disabled") {
+      items.push({
+        id: log.id,
+        type: "admin_created",
+        title: "Admin suspended",
+        description: email ?? "Administrator account suspended",
+        timestamp: log.created_at,
+        href: "#admins",
+      });
+    } else if (log.action === "admin.deleted") {
+      items.push({
+        id: log.id,
+        type: "admin_created",
+        title: "Admin deleted",
+        description: email ?? "Administrator account removed",
+        timestamp: log.created_at,
+        href: "#admins",
+      });
+    } else if (log.action === "admin.password_reset_sent") {
+      items.push({
+        id: log.id,
+        type: "admin_created",
+        title: "Password reset sent",
+        description: email ?? "Administrator password reset",
         timestamp: log.created_at,
         href: "#admins",
       });
@@ -260,6 +305,14 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
     (l) => l.status === "contacted" || l.status === "qualified",
   ).length;
 
+  const activeAdmins = directory.filter(
+    (d) => !d.isInvitation && d.status === "active",
+  ).length;
+  const pendingInvitations = directory.filter((d) => d.isInvitation).length;
+  const suspendedAdmins = directory.filter(
+    (d) => !d.isInvitation && d.status === "suspended",
+  ).length;
+
   return {
     kpis: {
       totalBrands: {
@@ -282,6 +335,12 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
         changePercent: trendFromDates(adminDates),
         href: "#admins",
       },
+    },
+    adminStats: {
+      totalAdmins: directory.filter((d) => !d.isInvitation).length,
+      activeAdmins,
+      pendingInvitations,
+      suspendedAdmins,
     },
     activity: mergeActivity(brandFeed, logs, leads),
     pendingReviews: pendingBrands,
@@ -316,6 +375,12 @@ function emptyDashboard(error: string): OperationsDashboardData {
       pendingReviews: zero,
       totalLeads: zero,
       totalAdmins: zero,
+    },
+    adminStats: {
+      totalAdmins: 0,
+      activeAdmins: 0,
+      pendingInvitations: 0,
+      suspendedAdmins: 0,
     },
     activity: [],
     pendingReviews: [],

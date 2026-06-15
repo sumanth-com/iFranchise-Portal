@@ -47,6 +47,7 @@ type AuthExperienceProps = {
   envConfigured?: boolean;
   hasSession?: boolean;
   hasProfile?: boolean;
+  loggedOutMessage?: string | null;
 };
 
 export function AuthExperience({
@@ -57,6 +58,7 @@ export function AuthExperience({
   envConfigured = true,
   hasSession = false,
   hasProfile = false,
+  loggedOutMessage = null,
 }: AuthExperienceProps) {
   const [tab, setTab] = useState<AuthTab>(initialTab);
 
@@ -191,6 +193,10 @@ export function AuthExperience({
         </div>
       ) : (
         <>
+          {loggedOutMessage ? (
+            <AuthAlert error={null} message={loggedOutMessage} />
+          ) : null}
+
           {tab !== "forgot" ? (
             <div className="mt-5 flex gap-3 rounded-[16px] bg-slate-50 p-1 ring-1 ring-slate-200/60">
               <TabButton active={tab === "login"} onClick={() => setTab("login")}>

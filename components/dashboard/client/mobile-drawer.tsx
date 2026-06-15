@@ -15,12 +15,14 @@ type MobileDrawerProps = {
   open: boolean;
   onClose: () => void;
   groups: ClientNavGroup[];
+  userId?: string | null;
 };
 
 export function MobileDrawer({
   open,
   onClose,
   groups,
+  userId,
 }: MobileDrawerProps) {
   const pathname = usePathname();
 
@@ -93,7 +95,7 @@ export function MobileDrawer({
                 </div>
               ))}
             </nav>
-            <SidebarBrandFooter collapsed={false} />
+            <SidebarBrandFooter collapsed={false} userId={userId} />
           </motion.aside>
         </>
       ) : null}

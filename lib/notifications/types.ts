@@ -12,7 +12,8 @@ export type NotificationCategory =
 export type AdminNotificationCategory =
   | "new_submission"
   | "resubmission"
-  | "owner_activity";
+  | "owner_activity"
+  | "team_admin";
 
 export type AdminNotificationMessage = {
   greetingName: string;
@@ -70,4 +71,5 @@ export const ADMIN_NOTIFICATION_CATEGORY_LABELS: Record<
   new_submission: "New Submission",
   resubmission: "Resubmission",
   owner_activity: "Brand Owner Activity",
+  team_admin: "Team & Admin",
 };

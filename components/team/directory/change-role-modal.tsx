@@ -1,23 +1,36 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTransition } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { TEAM_DESIGNATIONS, type TeamDirectoryMember } from "@/types/team-directory";
+import {
+  changeAdminRole,
+  initialAdminManagementState,
+} from "@/lib/admin-management/actions";
+import { ADMIN_INVITE_ROLES } from "@/lib/admin-management/permissions-display";
+import type { TeamDirectoryMember } from "@/types/team-directory";
 
 type ChangeRoleModalProps = {
   member: TeamDirectoryMember | null;
   onClose: () => void;
-  onSave: (memberId: string, role: string) => void;
+  onSaved: () => void;
 };
+
+function currentAdminRole(member: TeamDirectoryMember): string {
+  if (member.team_role === "super_admin") return "super_admin";
+  return "admin";
+}
 
 export function ChangeRoleModal({
   member,
   onClose,
-  onSave,
+  onSaved,
 }: ChangeRoleModalProps) {
+  const [pending, startTransition] = useTransition();
+
   return (
     <AnimatePresence>
       {member ? (
@@ -50,28 +63,49 @@ export function ChangeRoleModal({
               className="mt-5 space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                const role = new FormData(e.currentTarget).get("role") as string;
-                onSave(member.id, role);
-                onClose();
+                if (member.source !== "supabase" || member.is_invitation) return;
+                const adminRole = new FormData(e.currentTarget).get(
+                  "adminRole",
+                ) as string;
+                const fd = new FormData();
+                fd.set("memberId", member.id);
+                fd.set("adminRole", adminRole);
+                startTransition(async () => {
+                  const result = await changeAdminRole(
+                    initialAdminManagementState,
+                    fd,
+                  );
+                  if (!result.error) {
+                    onSaved();
+                    onClose();
+                  } else {
+                    alert(result.error);
+                  }
+                });
               }}
             >
               <div className="space-y-1.5">
-                <Label htmlFor="change-role">Designation</Label>
+                <Label htmlFor="change-role">Access level</Label>
                 <select
                   id="change-role"
-                  name="role"
-                  defaultValue={member.role}
+                  name="adminRole"
+                  defaultValue={currentAdminRole(member)}
+                  disabled={pending || member.is_invitation}
                   className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm"
                 >
-                  {TEAM_DESIGNATIONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                  {ADMIN_INVITE_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
                     </option>
                   ))}
                 </select>
               </div>
-              <Button type="submit" className="w-full">
-                Update role
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={pending || member.is_invitation}
+              >
+                {pending ? "Updating…" : "Update role"}
               </Button>
             </form>
           </motion.div>

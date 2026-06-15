@@ -1,12 +1,12 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, MailPlus, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, MailPlus } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { InviteTeamModal } from "@/components/team/InviteTeamModal";
-import { AddTeamMemberModal } from "@/components/team/directory/add-team-member-modal";
+import { AdminDeleteTransferDialog } from "@/components/admin-command-center/admin-delete-transfer-dialog";
+import { AdminPermissionsModal } from "@/components/admin-command-center/admin-permissions-modal";
 import { ChangeRoleModal } from "@/components/team/directory/change-role-modal";
-import { RemoveTeamMemberDialog } from "@/components/team/directory/remove-team-member-dialog";
 import {
   TeamActionMenu,
   type TeamAction,
@@ -16,23 +16,32 @@ import { TeamDirectoryStatsBar } from "@/components/team/directory/team-director
 import { TeamMemberCard } from "@/components/team/directory/team-member-card";
 import { TeamProfileDrawer } from "@/components/team/directory/team-profile-drawer";
 import { Button } from "@/components/ui/button";
-import { getAssignableRoles } from "@/lib/team/permissions";
+import {
+  deleteAdminAccount,
+  getAdminPermissionsAction,
+  initialAdminManagementState,
+  sendAdminPasswordReset,
+  setAdminAccountActiveForm,
+  updateAdminAccount,
+} from "@/lib/admin-management/actions";
 import {
   computeTeamStats,
   filterTeamMembers,
   mergeTeamDirectory,
 } from "@/lib/team/directory-data";
 import { formatRelativeTime } from "@/lib/format-date";
-import { setTeamMemberActiveForm } from "@/lib/team/actions";
+import { useAdminStaffRealtime } from "@/lib/hooks/use-admin-staff-realtime";
+import { useSafeRouterRefresh } from "@/lib/navigation/safe-router-refresh";
 import type { Profile } from "@/types/auth";
 import type { TeamDirectoryMember } from "@/types/team-directory";
-import type { TeamMember, TeamRole } from "@/types/team";
+import type { TeamMember, TeamInvitation } from "@/types/team";
 
 const PAGE_SIZE = 12;
 
 type TeamDirectoryPageProps = {
   currentProfile: Profile;
   supabaseMembers: TeamMember[];
+  pendingInvitations?: TeamInvitation[];
   isSuperAdmin: boolean;
   canInvite: boolean;
 };
@@ -65,12 +74,21 @@ function memberActivity(member: TeamDirectoryMember) {
 export function TeamDirectoryPage({
   currentProfile,
   supabaseMembers,
+  pendingInvitations = [],
   isSuperAdmin,
   canInvite,
 }: TeamDirectoryPageProps) {
+  const refresh = useSafeRouterRefresh();
+  const [, startTransition] = useTransition();
+  useAdminStaffRealtime(isSuperAdmin);
+
   const [members, setMembers] = useState<TeamDirectoryMember[]>(() =>
-    mergeTeamDirectory(supabaseMembers),
+    mergeTeamDirectory(supabaseMembers, pendingInvitations),
   );
+
+  useEffect(() => {
+    setMembers(mergeTeamDirectory(supabaseMembers, pendingInvitations));
+  }, [supabaseMembers, pendingInvitations]);
   const [nameQuery, setNameQuery] = useState("");
   const [emailQuery, setEmailQuery] = useState("");
   const [department, setDepartment] = useState("All Departments");
@@ -85,11 +103,32 @@ export function TeamDirectoryPage({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
     null,
   );
-  const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleMember, setRoleMember] = useState<TeamDirectoryMember | null>(null);
   const [removeMember, setRemoveMember] = useState<TeamDirectoryMember | null>(
     null,
+  );
+  const [permissionsMember, setPermissionsMember] =
+    useState<TeamDirectoryMember | null>(null);
+  const [permissionRows, setPermissionRows] = useState<
+    { permission: string; enabled: boolean }[]
+  >([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const transferCandidates = useMemo(
+    () =>
+      members
+        .filter(
+          (m) =>
+            m.source === "supabase" &&
+            !m.is_invitation &&
+            m.id !== removeMember?.id,
+        )
+        .map((m) => ({
+          id: m.id,
+          label: m.full_name || m.email,
+        })),
+    [members, removeMember?.id],
   );
 
   const stats = useMemo(() => computeTeamStats(members), [members]);
@@ -112,9 +151,26 @@ export function TeamDirectoryPage({
     page * PAGE_SIZE,
   );
 
-  const assignableRoles = getAssignableRoles(
-    currentProfile.team_role as TeamRole,
-  );
+  async function handleProfileSave(member: TeamDirectoryMember) {
+    if (member.source === "supabase" && !member.is_invitation && isSuperAdmin) {
+      const fd = new FormData();
+      fd.set("memberId", member.id);
+      fd.set("fullName", member.full_name);
+      fd.set("phone", member.phone === "—" ? "" : member.phone);
+      fd.set("department", member.department);
+      startTransition(async () => {
+        const result = await updateAdminAccount(initialAdminManagementState, fd);
+        if (result.error) {
+          alert(result.error);
+          return;
+        }
+        updateMember(member.id, member);
+        refresh();
+      });
+      return;
+    }
+    updateMember(member.id, member);
+  }
 
   function updateMember(id: string, patch: Partial<TeamDirectoryMember>) {
     setMembers((prev) =>
@@ -137,45 +193,71 @@ export function TeamDirectoryPage({
         setRoleMember(member);
         break;
       case "activate":
-        updateMember(member.id, {
-          status: "active",
-          last_active_at: new Date().toISOString(),
-        });
-        if (member.source === "supabase") {
+        if (member.source === "supabase" && !member.is_invitation) {
           const fd = new FormData();
           fd.set("memberId", member.id);
           fd.set("isActive", "true");
-          void setTeamMemberActiveForm(fd);
+          startTransition(() => {
+            void setAdminAccountActiveForm(fd).then(() => refresh());
+          });
         }
         break;
       case "deactivate":
-        updateMember(member.id, { status: "inactive" });
-        if (member.source === "supabase") {
+        if (member.source === "supabase" && !member.is_invitation) {
           const fd = new FormData();
           fd.set("memberId", member.id);
           fd.set("isActive", "false");
-          void setTeamMemberActiveForm(fd);
+          startTransition(() => {
+            void setAdminAccountActiveForm(fd).then(() => refresh());
+          });
+        }
+        break;
+      case "reset":
+        if (member.source === "supabase" && !member.is_invitation && isSuperAdmin) {
+          const fd = new FormData();
+          fd.set("memberId", member.id);
+          startTransition(async () => {
+            const result = await sendAdminPasswordReset(
+              initialAdminManagementState,
+              fd,
+            );
+            alert(result.error ?? result.message ?? "Password reset sent.");
+          });
+        }
+        break;
+      case "permissions":
+        if (member.source === "supabase" && !member.is_invitation && isSuperAdmin) {
+          void getAdminPermissionsAction(member.id).then(({ permissions }) => {
+            setPermissionRows(permissions);
+            setPermissionsMember(member);
+          });
         }
         break;
       case "remove":
-        setRemoveMember(member);
+        if (member.source === "supabase" && !member.is_invitation) {
+          setRemoveMember(member);
+        }
         break;
     }
   }
 
-  function handleAdd(
-    data: Omit<TeamDirectoryMember, "id" | "source">,
-  ) {
-    const id = `local-${Date.now()}`;
-    setMembers((prev) => [{ ...data, id, source: "dummy" }, ...prev]);
-    setPage(1);
-  }
-
-  function handleRemove() {
-    if (!removeMember) return;
-    setMembers((prev) => prev.filter((m) => m.id !== removeMember.id));
-    if (drawerMember?.id === removeMember.id) setDrawerMember(null);
-    setRemoveMember(null);
+  function handleDeleteConfirm(transferToId: string | null) {
+    if (!removeMember || removeMember.source !== "supabase") return;
+    const fd = new FormData();
+    fd.set("memberId", removeMember.id);
+    if (transferToId) fd.set("transferToId", transferToId);
+    setDeleteLoading(true);
+    startTransition(async () => {
+      const result = await deleteAdminAccount(initialAdminManagementState, fd);
+      setDeleteLoading(false);
+      if (!result.error) {
+        setRemoveMember(null);
+        if (drawerMember?.id === removeMember.id) setDrawerMember(null);
+        refresh();
+      } else {
+        alert(result.error);
+      }
+    });
   }
 
   function openMenu(member: TeamDirectoryMember, rect: DOMRect) {
@@ -205,17 +287,12 @@ export function TeamDirectoryPage({
           {canInvite ? (
             <Button
               type="button"
-              variant="secondary"
               onClick={() => setInviteOpen(true)}
             >
               <MailPlus className="h-4 w-4" />
-              Invite Member
+              Invite Admin
             </Button>
           ) : null}
-          <Button type="button" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Team Member
-          </Button>
         </div>
       </div>
 
@@ -335,34 +412,48 @@ export function TeamDirectoryPage({
       <TeamProfileDrawer
         member={drawerMember}
         onClose={() => setDrawerMember(null)}
-        onSave={(m) => updateMember(m.id, m)}
+        onSave={handleProfileSave}
+        canEdit={Boolean(
+          drawerMember?.source === "supabase" &&
+            !drawerMember?.is_invitation &&
+            isSuperAdmin,
+        )}
         activity={drawerMember ? memberActivity(drawerMember) : []}
-      />
-
-      <AddTeamMemberModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onAdd={handleAdd}
       />
 
       {canInvite ? (
         <InviteTeamModal
           open={inviteOpen}
           onClose={() => setInviteOpen(false)}
-          assignableRoles={assignableRoles}
+          assignableRoles={[]}
         />
       ) : null}
 
       <ChangeRoleModal
         member={roleMember}
         onClose={() => setRoleMember(null)}
-        onSave={(id, newRole) => updateMember(id, { role: newRole })}
+        onSaved={() => refresh()}
       />
 
-      <RemoveTeamMemberDialog
-        member={removeMember}
-        onConfirm={handleRemove}
+      <AdminDeleteTransferDialog
+        open={removeMember !== null}
+        adminId={removeMember?.id ?? null}
+        adminLabel={removeMember?.full_name ?? removeMember?.email ?? ""}
+        transferCandidates={transferCandidates}
+        loading={deleteLoading}
+        onConfirm={handleDeleteConfirm}
         onClose={() => setRemoveMember(null)}
+      />
+
+      <AdminPermissionsModal
+        memberId={permissionsMember?.id ?? null}
+        memberLabel={permissionsMember?.full_name ?? permissionsMember?.email ?? ""}
+        teamRole={permissionsMember?.team_role ?? null}
+        initialPermissions={permissionRows}
+        onClose={() => {
+          setPermissionsMember(null);
+          setPermissionRows([]);
+        }}
       />
     </div>
   );

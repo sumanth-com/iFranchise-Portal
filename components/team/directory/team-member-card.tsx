@@ -113,18 +113,28 @@ export function TeamMemberCard({
           <span
             className={cn(
               "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              member.status === "active"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-100 text-slate-600",
+              member.is_invitation
+                ? "bg-amber-50 text-amber-700"
+                : member.status === "active"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-600",
             )}
           >
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full",
-                member.status === "active" ? "bg-emerald-500" : "bg-slate-400",
+                member.is_invitation
+                  ? "bg-amber-500"
+                  : member.status === "active"
+                    ? "bg-emerald-500"
+                    : "bg-slate-400",
               )}
             />
-            {member.status === "active" ? "Active" : "Off"}
+            {member.is_invitation
+              ? "Pending"
+              : member.status === "active"
+                ? "Active"
+                : "Suspended"}
           </span>
         </div>
       </button>

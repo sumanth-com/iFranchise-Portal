@@ -1,5 +1,5 @@
-import { DashboardSkeleton } from "@/components/admin/dashboard/dashboard-skeleton";
+import { AuthLoadingScreen } from "@/components/auth/auth-loading-screen";
 
 export default function AdminLoading() {
-  return <DashboardSkeleton />;
+  return <AuthLoadingScreen />;
 }

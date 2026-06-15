@@ -3,8 +3,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Eye,
+  KeyRound,
   Pencil,
   Shield,
+  ShieldCheck,
   Trash2,
   UserCheck,
   UserX,
@@ -18,6 +20,8 @@ export type TeamAction =
   | "view"
   | "edit"
   | "role"
+  | "reset"
+  | "permissions"
   | "activate"
   | "deactivate"
   | "remove";
@@ -54,6 +58,9 @@ export function TeamActionMenu({
     };
   }, [onClose]);
 
+  const isSupabaseAccount =
+    member?.source === "supabase" && !member?.is_invitation;
+
   const items: {
     id: TeamAction;
     label: string;
@@ -62,19 +69,42 @@ export function TeamActionMenu({
     hidden?: boolean;
   }[] = [
     { id: "view", label: "View Profile", icon: Eye },
-    { id: "edit", label: "Edit Details", icon: Pencil },
-    { id: "role", label: "Change Role", icon: Shield },
+    {
+      id: "edit",
+      label: "Edit Details",
+      icon: Pencil,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
+    },
+    {
+      id: "role",
+      label: "Change Role",
+      icon: Shield,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
+    },
+    {
+      id: "reset",
+      label: "Reset Password",
+      icon: KeyRound,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
+    },
+    {
+      id: "permissions",
+      label: "Permissions",
+      icon: ShieldCheck,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
+    },
     {
       id: member?.status === "active" ? "deactivate" : "activate",
-      label: member?.status === "active" ? "Deactivate Account" : "Activate Account",
+      label: member?.status === "active" ? "Suspend Account" : "Activate Account",
       icon: member?.status === "active" ? UserX : UserCheck,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
     },
     {
       id: "remove",
-      label: "Remove Team Member",
+      label: "Delete Account",
       icon: Trash2,
       danger: true,
-      hidden: !isSuperAdmin,
+      hidden: !isSupabaseAccount || !isSuperAdmin,
     },
   ];
 

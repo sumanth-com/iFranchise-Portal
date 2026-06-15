@@ -2,14 +2,18 @@
 
 import { LogOut } from "lucide-react";
 
-import { logout } from "@/lib/auth/actions";
+import { LogoutControl } from "@/components/auth/logout-control";
 import { cn } from "@/lib/utils";
 
 type SidebarBrandFooterProps = {
   collapsed: boolean;
+  userId?: string | null;
 };
 
-export function SidebarBrandFooter({ collapsed }: SidebarBrandFooterProps) {
+export function SidebarBrandFooter({
+  collapsed,
+  userId,
+}: SidebarBrandFooterProps) {
   return (
     <div
       className={cn(
@@ -17,7 +21,7 @@ export function SidebarBrandFooter({ collapsed }: SidebarBrandFooterProps) {
         collapsed ? "px-2 py-3" : "px-3 py-3.5",
       )}
     >
-      <form action={logout}>
+      <LogoutControl userId={userId} className="w-full">
         <button
           type="submit"
           className={cn(
@@ -32,7 +36,7 @@ export function SidebarBrandFooter({ collapsed }: SidebarBrandFooterProps) {
           <LogOut className="h-4 w-4 shrink-0" />
           {!collapsed ? <span>Logout</span> : null}
         </button>
-      </form>
+      </LogoutControl>
     </div>
   );
 }

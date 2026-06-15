@@ -23,6 +23,8 @@ export type TeamDirectoryMember = {
   /** Portal team_role when synced from Supabase. */
   team_role?: TeamRole;
   source: "dummy" | "supabase";
+  is_invitation?: boolean;
+  invitation_id?: string | null;
 };
 
 export type TeamDirectoryStats = {

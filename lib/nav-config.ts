@@ -141,6 +141,12 @@ export const adminNavGroups: ClientNavGroup[] = [
         mobileLabel: "Command",
       },
       {
+        href: "/admin/auth-diagnostics",
+        label: "Auth diagnostics",
+        icon: "settings",
+        mobileLabel: "Auth",
+      },
+      {
         href: "/admin/team",
         label: "Team",
         icon: "users",

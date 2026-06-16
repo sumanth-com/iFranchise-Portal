@@ -45,7 +45,10 @@ export default async function AdminLayout({
   const navGroups = adminNavGroups.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
-      if (item.href === "/admin/admin-management") {
+      if (
+        item.href === "/admin/admin-management" ||
+        item.href === "/admin/auth-diagnostics"
+      ) {
         return isSuperAdminProfile(profile);
       }
       if (item.href === "/admin/team") {

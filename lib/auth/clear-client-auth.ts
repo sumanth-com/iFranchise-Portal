@@ -6,6 +6,16 @@ const AUTH_STORAGE_PREFIXES = [
   "ifranchise-profile-extras",
 ] as const;
 
+const RECOVERY_COOKIE = "if_auth_recovery";
+
+function isSupabaseAuthStorageKey(key: string): boolean {
+  return key.startsWith("sb-") || key.includes("-auth-token");
+}
+
+function clearRecoveryCookie(): void {
+  document.cookie = `${RECOVERY_COOKIE}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+}
+
 /**
  * Clears client-side caches that must not survive logout.
  * Safe to call without a user id — scans all matching keys.
@@ -20,7 +30,10 @@ export function clearClientAuthStorage(userId?: string | null): void {
       const key = localStorage.key(i);
       if (!key) continue;
 
-      if (AUTH_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      if (
+        AUTH_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix)) ||
+        isSupabaseAuthStorageKey(key)
+      ) {
         keysToRemove.add(key);
       }
 
@@ -35,4 +48,25 @@ export function clearClientAuthStorage(userId?: string | null): void {
   } catch {
     // Ignore storage failures (private mode, quota, etc.)
   }
+
+  try {
+    const sessionKeys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key) continue;
+      if (
+        AUTH_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix)) ||
+        isSupabaseAuthStorageKey(key)
+      ) {
+        sessionKeys.push(key);
+      }
+    }
+    for (const key of sessionKeys) {
+      sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Ignore storage failures.
+  }
+
+  clearRecoveryCookie();
 }

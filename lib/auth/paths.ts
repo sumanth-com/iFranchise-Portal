@@ -12,6 +12,7 @@ export const PROTECTED_PATHS = {
 
 export const SUPER_ADMIN_ONLY_PATHS = {
   adminManagement: "/admin/admin-management",
+  authDiagnostics: "/admin/auth-diagnostics",
 } as const;
 
 export function getRedirectPathForRole(role: "client" | "admin" | "super_admin"): string {
@@ -21,7 +22,9 @@ export function getRedirectPathForRole(role: "client" | "admin" | "super_admin")
 export function isSuperAdminOnlyPath(pathname: string): boolean {
   return (
     pathname === SUPER_ADMIN_ONLY_PATHS.adminManagement ||
-    pathname.startsWith(`${SUPER_ADMIN_ONLY_PATHS.adminManagement}/`)
+    pathname.startsWith(`${SUPER_ADMIN_ONLY_PATHS.adminManagement}/`) ||
+    pathname === SUPER_ADMIN_ONLY_PATHS.authDiagnostics ||
+    pathname.startsWith(`${SUPER_ADMIN_ONLY_PATHS.authDiagnostics}/`)
   );
 }
 

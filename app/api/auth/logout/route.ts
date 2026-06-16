@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { logAuthEvent } from "@/lib/auth/auth-events";
 import {
   applyNoStoreHeaders,
   clearSupabaseAuthCookies,
@@ -46,6 +47,13 @@ async function buildLogoutResponse(request: NextRequest) {
   }
 
   clearSupabaseAuthCookies(request, response);
+  response.cookies.set("if_auth_recovery", "", {
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  logAuthEvent("auth.logout");
   return response;
 }
 

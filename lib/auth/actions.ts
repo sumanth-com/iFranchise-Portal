@@ -18,6 +18,7 @@ import {
   humanizeAuthError,
   unavailableAuthState,
 } from "@/lib/auth/humanize-error";
+import { logAuthEvent } from "@/lib/auth/auth-events";
 import { authDebug, authProfileTrace } from "@/lib/auth/profile";
 import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { verifySupabaseConnectivity } from "@/lib/supabase/connectivity";
@@ -26,19 +27,30 @@ import { createClientOptional } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/types/auth";
 
 function envErrorState(): AuthActionState {
-  const status = getSupabaseEnvStatus();
   return {
-    error:
-      status.issues[0] ??
-      "Authentication is not configured. Check environment variables.",
+    error: "Authentication is not configured. Contact support.",
     message: null,
   };
 }
 
-async function preflightAuth(): Promise<AuthActionState | null> {
+function preflightEnv(): AuthActionState | null {
   const envStatus = getSupabaseEnvStatus();
   if (!envStatus.configured) {
     return envErrorState();
+  }
+  return null;
+}
+
+async function preflightAuth(options?: {
+  requireConnectivity?: boolean;
+}): Promise<AuthActionState | null> {
+  const envBlock = preflightEnv();
+  if (envBlock) {
+    return envBlock;
+  }
+
+  if (options?.requireConnectivity === false) {
+    return null;
   }
 
   const connectivity = await verifySupabaseConnectivity();
@@ -100,14 +112,24 @@ export async function login(
     return { error: "Email and password are required.", message: null };
   }
 
-  const preflight = await preflightAuth();
+  logAuthEvent("auth.login.attempt", { email });
+
+  const preflight = await preflightAuth({ requireConnectivity: false });
   if (preflight) {
+    logAuthEvent("auth.login.failure", {
+      email,
+      reason: "env_not_configured",
+    });
     return preflight;
   }
 
   try {
     const supabase = await createClientOptional();
     if (!supabase) {
+      logAuthEvent("auth.login.failure", {
+        email,
+        reason: "client_unavailable",
+      });
       return envErrorState();
     }
 
@@ -121,10 +143,19 @@ export async function login(
         message: error.message,
         code: error.code,
       });
+      logAuthEvent("auth.login.failure", {
+        email,
+        code: error.code ?? null,
+        reason: "invalid_credentials",
+      });
       return { error: humanizeAuthError(error), message: null };
     }
 
     if (!data.user) {
+      logAuthEvent("auth.login.failure", {
+        email,
+        reason: "no_user",
+      });
       return { error: "Please sign in to continue.", message: null };
     }
 
@@ -139,6 +170,11 @@ export async function login(
         "error",
       );
       authDebug("login-profile-missing", { userId: data.user.id });
+      logAuthEvent("auth.login.failure", {
+        email,
+        userId: data.user.id,
+        reason: "profile_missing",
+      });
       return {
         error: "Please sign in to continue.",
         message: null,
@@ -150,6 +186,12 @@ export async function login(
     if (profile.role === "admin" || profile.role === "super_admin") {
       await touchLastLogin(data.user.id, supabase);
     }
+
+    logAuthEvent("auth.login.success", {
+      email,
+      userId: data.user.id,
+      role: profile.role,
+    });
 
     authDebug("login-redirect", {
       userId: data.user.id,
@@ -163,6 +205,10 @@ export async function login(
     if (isServiceUnavailableError(error)) {
       authDebug("login-network-error", {
         error: error instanceof Error ? error.message : String(error),
+      });
+      logAuthEvent("auth.login.failure", {
+        email,
+        reason: "service_unavailable",
       });
       return unavailableAuthState();
     }
@@ -192,14 +238,24 @@ export async function signup(
     };
   }
 
+  logAuthEvent("auth.signup.attempt", { email });
+
   const preflight = await preflightAuth();
   if (preflight) {
+    logAuthEvent("auth.signup.failure", {
+      email,
+      reason: "preflight_failed",
+    });
     return preflight;
   }
 
   try {
     const supabase = await createClientOptional();
     if (!supabase) {
+      logAuthEvent("auth.signup.failure", {
+        email,
+        reason: "client_unavailable",
+      });
       return envErrorState();
     }
 
@@ -212,14 +268,28 @@ export async function signup(
     });
 
     if (error) {
+      logAuthEvent("auth.signup.failure", {
+        email,
+        code: error.code ?? null,
+        reason: "signup_error",
+      });
       return { error: humanizeAuthError(error), message: null };
     }
 
     if (!data.user) {
+      logAuthEvent("auth.signup.failure", {
+        email,
+        reason: "no_user",
+      });
       return { error: "Unable to create account. Try again.", message: null };
     }
 
     if (!data.session) {
+      logAuthEvent("auth.signup.success", {
+        email,
+        userId: data.user.id,
+        reason: "email_confirmation_pending",
+      });
       return {
         error: null,
         message:
@@ -231,6 +301,12 @@ export async function signup(
     const role = profile?.role ?? "client";
     const destination = getRedirectPathForRole(role);
 
+    logAuthEvent("auth.signup.success", {
+      email,
+      userId: data.user.id,
+      role,
+    });
+
     authDebug("signup-redirect", {
       userId: data.user.id,
       profileId: profile?.id ?? null,
@@ -241,6 +317,10 @@ export async function signup(
     redirect(destination);
   } catch (error) {
     if (isServiceUnavailableError(error)) {
+      logAuthEvent("auth.signup.failure", {
+        email,
+        reason: "service_unavailable",
+      });
       return unavailableAuthState();
     }
     throw error;
@@ -274,8 +354,15 @@ export async function forgotPassword(
     });
 
     if (error) {
+      logAuthEvent("auth.password_reset.failure", {
+        email,
+        code: error.code ?? null,
+        reason: "reset_email_failed",
+      });
       return { error: humanizeAuthError(error), message: null };
     }
+
+    logAuthEvent("auth.password_reset.request", { email });
 
     return {
       error: null,
@@ -283,6 +370,10 @@ export async function forgotPassword(
     };
   } catch (error) {
     if (isServiceUnavailableError(error)) {
+      logAuthEvent("auth.password_reset.failure", {
+        email,
+        reason: "service_unavailable",
+      });
       return unavailableAuthState();
     }
     throw error;
@@ -459,12 +550,18 @@ export async function resetPassword(
         message: updateError.message,
         code: updateError.code,
       });
+      logAuthEvent("auth.password_reset.failure", {
+        userId: user.id,
+        code: updateError.code ?? null,
+        reason: "update_failed",
+      });
       return { error: humanizeAuthError(updateError), message: null };
     }
 
     await supabase.auth.signOut({ scope: "global" });
 
     authDebug("reset-password-success", { userId: user.id });
+    logAuthEvent("auth.password_reset.success", { userId: user.id });
 
     return {
       error: null,

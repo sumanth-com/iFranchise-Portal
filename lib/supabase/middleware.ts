@@ -1,15 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-import {
-  AUTH_ERROR_CODES,
-  isBlockingAuthError,
-} from "@/lib/auth/auth-errors";
+import { tryRefreshSession } from "@/lib/auth/refresh-session";
+import { AUTH_ERROR_CODES } from "@/lib/auth/auth-errors";
 import {
   applyNoStoreHeaders,
   clearSupabaseAuthCookies,
   hasSupabaseAuthCookies,
 } from "@/lib/auth/cookies";
+import {
+  readAuthNoticeCookie,
+  setAuthNoticeCookie,
+  type AuthNoticeKind,
+} from "@/lib/auth/notice";
 import {
   AUTH_PATHS,
   getRedirectPathForRole,
@@ -70,16 +73,13 @@ function createMiddlewareClient(request: NextRequest) {
 
 function redirectToLogin(
   request: NextRequest,
-  error?: string,
+  notice?: AuthNoticeKind,
   redirectTo?: string,
 ) {
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = AUTH_PATHS.login;
   loginUrl.search = "";
 
-  if (error) {
-    loginUrl.searchParams.set("error", error);
-  }
   if (redirectTo) {
     loginUrl.searchParams.set("redirectTo", redirectTo);
   }
@@ -87,8 +87,11 @@ function redirectToLogin(
   const response = NextResponse.redirect(loginUrl);
   applyNoStoreHeaders(response);
 
-  if (error === AUTH_ERROR_CODES.expired || error === AUTH_ERROR_CODES.auth) {
-    clearSupabaseAuthCookies(request, response);
+  if (notice) {
+    setAuthNoticeCookie(response, notice);
+    if (notice === "session_ended" || notice === "sign_in_required") {
+      clearSupabaseAuthCookies(request, response);
+    }
   }
 
   return response;
@@ -157,9 +160,41 @@ async function loadProfileGate(
   }
 }
 
+async function repairProfileInMiddleware(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<ProfileGate | null> {
+  try {
+    const { data, error } = await supabase.rpc("ensure_own_profile");
+
+    if (error || !data) {
+      authDebug("middleware-profile-repair-failed", {
+        userId,
+        error: error?.message ?? "no data",
+      });
+      return null;
+    }
+
+    authDebug("middleware-profile-repaired", { userId, profileId: data.id });
+
+    return {
+      role: data.role as UserRole,
+      is_active: data.is_active ?? true,
+      team_role: data.team_role ?? null,
+    };
+  } catch (error) {
+    authDebug("middleware-profile-repair-exception", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const authError = request.nextUrl.searchParams.get("error");
+  const legacyError = request.nextUrl.searchParams.get("error");
+  const existingNotice = readAuthNoticeCookie(request);
 
   // OAuth callback must run without middleware redirects or extra auth calls.
   if (pathname.startsWith("/auth/callback")) {
@@ -169,7 +204,7 @@ export async function updateSession(request: NextRequest) {
   const client = createMiddlewareClient(request);
   if (!client) {
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+      return redirectToLogin(request, "sign_in_required", pathname);
     }
     if (pathname === "/") {
       return redirectToLogin(request);
@@ -184,8 +219,9 @@ export async function updateSession(request: NextRequest) {
   // to recover; skip a slow Supabase round-trip on every refresh.
   if (
     isAuthPath(pathname) &&
-    authError === AUTH_ERROR_CODES.unavailable &&
-    !hasAuthCookies
+    legacyError === AUTH_ERROR_CODES.unavailable &&
+    !hasAuthCookies &&
+    !existingNotice
   ) {
     return NextResponse.next({ request });
   }
@@ -193,7 +229,7 @@ export async function updateSession(request: NextRequest) {
   // No session cookies — skip Supabase auth call entirely.
   if (!hasAuthCookies) {
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, undefined, pathname);
+      return redirectToLogin(request, "sign_in_required", pathname);
     }
     if (pathname === "/") {
       return redirectToLogin(request);
@@ -219,12 +255,31 @@ export async function updateSession(request: NextRequest) {
     if (resolved.unavailable) {
       authDebug("middleware-auth-unavailable", { pathname });
       if (isProtectedPath(pathname)) {
-        return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+        // Allow through — login page will show a soft retry message.
+        return getResponse();
       }
       return getResponse();
     }
 
     user = resolved.user;
+
+    // Silent session recovery before treating as logged out.
+    if (!user && sessionExpired) {
+      const refreshed = await tryRefreshSession(supabase);
+      if (refreshed) {
+        const {
+          data: { user: refreshedUser },
+          error: refreshError,
+        } = await supabase.auth.getUser();
+        const refreshResolved = resolveUserFromGetUser(refreshedUser, refreshError);
+        if (!refreshResolved.unavailable && refreshResolved.user) {
+          user = refreshResolved.user;
+          sessionExpired = false;
+          authDebug("middleware-session-recovered", { userId: user.id });
+        }
+      }
+    }
+
     authDebug("middleware-user", {
       userId: user?.id ?? null,
       pathname,
@@ -236,25 +291,26 @@ export async function updateSession(request: NextRequest) {
     });
 
     if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
-      return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+      return getResponse();
     }
 
-    // Network / unknown failures — treat as logged out, never loop on "unavailable".
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, undefined, pathname);
+      return redirectToLogin(request, "sign_in_required", pathname);
     }
     return getResponse();
   }
 
   // --- Unauthenticated ---
   if (!user) {
-    const loginError = sessionExpired ? AUTH_ERROR_CODES.expired : undefined;
+    const notice: AuthNoticeKind = sessionExpired
+      ? "session_ended"
+      : "sign_in_required";
 
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, loginError, pathname);
+      return redirectToLogin(request, notice, pathname);
     }
     if (pathname === "/") {
-      return redirectToLogin(request, loginError);
+      return redirectToLogin(request, notice);
     }
     return getResponse();
   }
@@ -271,12 +327,16 @@ export async function updateSession(request: NextRequest) {
   if (needsProfile) {
     try {
       profile = await loadProfileGate(supabase, user.id);
+
+      if (!profile) {
+        profile = await repairProfileInMiddleware(supabase, user.id);
+      }
     } catch (error) {
       if (isServiceUnavailableError(error) && isProtectedPath(pathname)) {
-        return redirectToLogin(request, AUTH_ERROR_CODES.unavailable, pathname);
+        return getResponse();
       }
       if (isProtectedPath(pathname)) {
-        return redirectToLogin(request, AUTH_ERROR_CODES.profile, pathname);
+        return redirectToLogin(request, "sign_in_required", pathname);
       }
       return getResponse();
     }
@@ -286,10 +346,14 @@ export async function updateSession(request: NextRequest) {
 
   // Disabled staff account (only when team_role is set — migration 004)
   if (profile && isDisabledStaffGate(profile)) {
-    if (isAuthPath(pathname) && authError === AUTH_ERROR_CODES.disabled) {
+    if (
+      isAuthPath(pathname) &&
+      (legacyError === AUTH_ERROR_CODES.disabled ||
+        existingNotice === "sign_in_required")
+    ) {
       return getResponse();
     }
-    return redirectToLogin(request, AUTH_ERROR_CODES.disabled);
+    return redirectToLogin(request, "sign_in_required");
   }
 
   // Missing profile row — critical loop fix:
@@ -300,7 +364,7 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (isProtectedPath(pathname)) {
-      return redirectToLogin(request, AUTH_ERROR_CODES.profile, pathname);
+      return redirectToLogin(request, "sign_in_required", pathname);
     }
 
     return getResponse();
@@ -311,18 +375,12 @@ export async function updateSession(request: NextRequest) {
     return redirectToApp(request, getRedirectPathForRole(role));
   }
 
-  // Auth pages: redirect into the app when profile is valid. Treat stale
-  // ?error=unavailable as non-blocking once session + profile resolve.
+  // Auth pages: redirect into the app when profile is valid.
   if (isAuthPath(pathname)) {
-    const blockingError =
-      isBlockingAuthError(authError) &&
-      authError !== AUTH_ERROR_CODES.unavailable;
-
-    if (blockingError) {
-      return getResponse();
+    if (profile) {
+      return redirectToApp(request, getRedirectPathForRole(role));
     }
-
-    return redirectToApp(request, getRedirectPathForRole(role));
+    return getResponse();
   }
 
   // Role-based route protection

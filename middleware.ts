@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { AUTH_ERROR_CODES } from "@/lib/auth/auth-errors";
+import { setAuthNoticeCookie } from "@/lib/auth/notice";
+import { applyNoStoreHeaders } from "@/lib/auth/cookies";
 import { isProtectedPath } from "@/lib/auth/paths";
 import { authDebug } from "@/lib/auth/profile";
-import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
@@ -21,13 +21,12 @@ export async function middleware(request: NextRequest) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
       loginUrl.search = "";
-
-      if (isServiceUnavailableError(error)) {
-        loginUrl.searchParams.set("error", AUTH_ERROR_CODES.unavailable);
-      }
       loginUrl.searchParams.set("redirectTo", pathname);
 
-      return NextResponse.redirect(loginUrl);
+      const response = NextResponse.redirect(loginUrl);
+      applyNoStoreHeaders(response);
+      setAuthNoticeCookie(response, "sign_in_required");
+      return response;
     }
 
     return NextResponse.next({ request });

@@ -1,8 +1,9 @@
 /**
- * One-time bootstrap: set password for an existing super_admin auth user.
- * Does NOT create users, profiles, or send email.
+ * Optional CLI: set password for an existing bootstrap Super Admin auth user.
+ * Password is read from SUPER_ADMIN_PASSWORD env var only — never hardcoded.
  *
- * Run: npx tsx scripts/set-super-admin-password.ts
+ * Run:
+ *   SUPER_ADMIN_PASSWORD='your-secure-password' npx tsx scripts/set-super-admin-password.ts
  *
  * Requires .env.local:
  *   NEXT_PUBLIC_SUPABASE_URL
@@ -12,8 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const EMAIL = "sumanth.reddy@ifranchise.in";
-const TEMP_PASSWORD = "Sumanth@123";
+import { BOOTSTRAP_SUPER_ADMIN_EMAIL } from "../lib/bootstrap/types";
 
 function loadEnv() {
   const raw = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
@@ -25,6 +25,21 @@ function loadEnv() {
 
 async function main() {
   loadEnv();
+
+  const password = process.env.SUPER_ADMIN_PASSWORD?.trim();
+  if (!password) {
+    console.error(
+      "Set SUPER_ADMIN_PASSWORD in your shell before running this script.",
+    );
+    console.error(
+      "Example: SUPER_ADMIN_PASSWORD='your-password' npx tsx scripts/set-super-admin-password.ts",
+    );
+    console.error("");
+    console.error(
+      "Prefer Supabase Dashboard → Authentication → Users → Send password reset.",
+    );
+    process.exit(1);
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -40,7 +55,7 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const normalizedEmail = EMAIL.trim().toLowerCase();
+  const normalizedEmail = BOOTSTRAP_SUPER_ADMIN_EMAIL.trim().toLowerCase();
 
   const { data: profile, error: profileError } = await admin
     .from("profiles")
@@ -54,13 +69,14 @@ async function main() {
   }
 
   if (!profile) {
-    console.error(`No profile found for ${EMAIL}`);
+    console.error(`No profile found for ${BOOTSTRAP_SUPER_ADMIN_EMAIL}`);
+    console.error("Run: npx tsx scripts/bootstrap-super-admin.ts");
     process.exit(1);
   }
 
   if (profile.role !== "super_admin") {
     console.error(
-      `Profile role is "${profile.role}", expected "super_admin". Aborting.`,
+      `Profile role is "${profile.role}", expected "super_admin". Run bootstrap repair first.`,
     );
     process.exit(1);
   }
@@ -77,18 +93,10 @@ async function main() {
     process.exit(1);
   }
 
-  const authEmail = authData.user.email?.trim().toLowerCase() ?? "";
-  if (authEmail !== normalizedEmail) {
-    console.error(
-      `Auth email mismatch: profile=${normalizedEmail}, auth=${authEmail}`,
-    );
-    process.exit(1);
-  }
-
   const { error: updateError } = await admin.auth.admin.updateUserById(
     profile.id,
     {
-      password: TEMP_PASSWORD,
+      password,
       email_confirm: true,
     },
   );
@@ -98,13 +106,10 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Password updated successfully.");
-  console.log(`  Email:  ${EMAIL}`);
-  console.log(`  User:   ${profile.id}`);
-  console.log(`  Role:   ${profile.role}`);
-  console.log("");
-  console.log("Sign in at /login with the temporary password.");
-  console.log("Change the password after your first login.");
+  console.log("Password updated via Supabase Auth.");
+  console.log(`  Email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL}`);
+  console.log(`  User:  ${profile.id}`);
+  console.log("Sign in at /login. Use password reset for future changes.");
 }
 
 main();

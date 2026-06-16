@@ -6,17 +6,8 @@ import { useActionState } from "react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { AuthAlert } from "@/components/auth/auth-alert";
-import { LogoutButton } from "@/components/auth/logout-button";
-import { RepairAccountButton } from "@/components/auth/repair-account-button";
 import { PremiumInput } from "@/components/auth/premium-input";
-import {
-  AUTH_ERROR_CODES,
-  isBlockingAuthError,
-} from "@/lib/auth/auth-errors";
-import {
-  getFieldFormError,
-  isAccountLevelFormError,
-} from "@/lib/auth/form-errors";
+import { getFieldFormError } from "@/lib/auth/form-errors";
 import { Button } from "@/components/ui/button";
 import { forgotPassword, login, signup } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
@@ -42,23 +33,17 @@ const TAB_COPY: Record<AuthTab, { title: string; description: string }> = {
 type AuthExperienceProps = {
   initialTab: AuthTab;
   redirectTo?: string | null;
-  pageError?: string | null;
-  authErrorCode?: string | null;
+  noticeMessage?: string | null;
   envConfigured?: boolean;
-  hasSession?: boolean;
-  hasProfile?: boolean;
-  loggedOutMessage?: string | null;
+  isRetrying?: boolean;
 };
 
 export function AuthExperience({
   initialTab,
   redirectTo,
-  pageError,
-  authErrorCode,
+  noticeMessage,
   envConfigured = true,
-  hasSession = false,
-  hasProfile = false,
-  loggedOutMessage = null,
+  isRetrying = false,
 }: AuthExperienceProps) {
   const [tab, setTab] = useState<AuthTab>(initialTab);
 
@@ -88,24 +73,7 @@ export function AuthExperience({
         ? signupPending
         : forgotPending;
 
-  const sessionBlocked =
-    (isBlockingAuthError(authErrorCode) && authErrorCode !== "unavailable") ||
-    (hasSession && !hasProfile);
-
-  const accountIssueMessage =
-    pageError ??
-    (isAccountLevelFormError(loginState.error) ? loginState.error : null);
-
-  const showAccountIssue =
-    sessionBlocked || Boolean(accountIssueMessage) || !envConfigured;
-
-  const showUnavailableOnly =
-    !envConfigured || authErrorCode === AUTH_ERROR_CODES.unavailable;
-
-  const loginFormError =
-    loginState.error && !isAccountLevelFormError(loginState.error)
-      ? loginState.error
-      : null;
+  const loginFormError = loginState.error ?? null;
 
   return (
     <motion.div
@@ -116,24 +84,12 @@ export function AuthExperience({
     >
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          {!envConfigured
-            ? "Configuration required"
-            : showAccountIssue && !showUnavailableOnly
-              ? "Account needs attention"
-              : showUnavailableOnly && showAccountIssue
-                ? "Connection issue"
-                : tabCopy.title}
+          {!envConfigured ? "Configuration required" : tabCopy.title}
         </h1>
 
-        {showAccountIssue ? (
+        {!envConfigured ? (
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            {!envConfigured
-              ? "Supabase environment variables are missing or invalid."
-              : showUnavailableOnly
-                ? "We could not reach the authentication service."
-                : hasSession
-                  ? "You are signed in, but we could not finish loading your account."
-                  : "We could not complete sign-in. Please try again."}
+            Supabase environment variables are missing or invalid.
           </p>
         ) : (
           <AnimatePresence mode="wait">
@@ -151,50 +107,50 @@ export function AuthExperience({
         )}
       </div>
 
-      {showAccountIssue ? (
+      {!envConfigured ? (
         <div className="mt-5 space-y-4">
-          {accountIssueMessage ? (
-            <AuthAlert error={accountIssueMessage} message={null} />
+          {noticeMessage ? (
+            <AuthAlert error={noticeMessage} message={null} />
           ) : null}
-          {!envConfigured ? (
-            <p className="text-sm text-slate-500">
-              Add{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-                NEXT_PUBLIC_SUPABASE_URL
-              </code>{" "}
-              and{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-                NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-              </code>{" "}
-              (or{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-                NEXT_PUBLIC_SUPABASE_ANON_KEY
-              </code>
-              ) to <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">.env.local</code>{" "}
-              and restart the dev server.
-            </p>
-          ) : (
-            <p className="text-sm text-slate-500">
-              {authErrorCode === AUTH_ERROR_CODES.profile || (hasSession && !hasProfile)
-                ? "We can try to finish setting up your account automatically."
-                : authErrorCode === AUTH_ERROR_CODES.unavailable
-                  ? "Check your internet connection and try again in a moment."
-                  : "Sign out and try again, or contact support if this continues."}
-            </p>
-          )}
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            {envConfigured &&
-            (authErrorCode === AUTH_ERROR_CODES.profile ||
-              (hasSession && !hasProfile)) ? (
-              <RepairAccountButton redirectTo={redirectTo} />
-            ) : null}
-            {hasSession ? <LogoutButton /> : null}
-          </div>
+          <p className="text-sm text-slate-500">
+            Add{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              NEXT_PUBLIC_SUPABASE_URL
+            </code>{" "}
+            and{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            </code>{" "}
+            (or{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              NEXT_PUBLIC_SUPABASE_ANON_KEY
+            </code>
+            ) to{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              .env.local
+            </code>{" "}
+            and restart the dev server.
+          </p>
         </div>
       ) : (
         <>
-          {loggedOutMessage ? (
-            <AuthAlert error={null} message={loggedOutMessage} />
+          {noticeMessage ? (
+            <div className="mt-5">
+              <AuthAlert
+                error={
+                  noticeMessage.includes("signed out") ? null : noticeMessage
+                }
+                message={
+                  noticeMessage.includes("signed out") ? noticeMessage : null
+                }
+              />
+            </div>
+          ) : null}
+
+          {isRetrying ? (
+            <p className="mt-3 text-sm text-slate-500">
+              We are having trouble connecting. You can still sign in below.
+            </p>
           ) : null}
 
           {tab !== "forgot" ? (
@@ -294,12 +250,7 @@ export function AuthExperience({
             {tab === "signup" ? (
               <form action={signupAction} className="space-y-4">
                 <AuthAlert
-                  error={
-                    signupState.error &&
-                    !isAccountLevelFormError(signupState.error)
-                      ? signupState.error
-                      : null
-                  }
+                  error={signupState.error}
                   message={signupState.message}
                 />
 

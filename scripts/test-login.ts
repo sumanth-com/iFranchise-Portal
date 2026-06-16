@@ -15,8 +15,12 @@ async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const email = "sumanth.reddy@ifranchise.in";
-  const password = "Sumanth@123";
+  const email = process.env.TEST_LOGIN_EMAIL?.trim();
+  const password = process.env.TEST_LOGIN_PASSWORD?.trim();
+  if (!email || !password) {
+    console.error("Set TEST_LOGIN_EMAIL and TEST_LOGIN_PASSWORD in the environment.");
+    process.exit(1);
+  }
 
   console.log("URL:", url);
   console.log("Key prefix:", key.slice(0, 20) + "...");

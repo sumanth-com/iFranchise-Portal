@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
-import { AUTH_ERROR_CODES } from "@/lib/auth/auth-errors";
+import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
 import { authDebug, isDisabledStaffProfile } from "@/lib/auth/profile";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -19,8 +19,8 @@ import { canManageTeam } from "@/lib/team/permissions";
 import type { Profile, UserRole } from "@/types/auth";
 import type { TeamRole } from "@/types/team";
 
-function redirectToLogin(error: string): never {
-  redirect(`/login?error=${error}`);
+function redirectToLogin(notice: "sign_in_required" | "session_ended"): never {
+  redirect(`/api/auth/redirect-login?notice=${notice}`);
 }
 
 /**
@@ -92,13 +92,13 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
 export async function requireUser() {
   const { url, publishableKey } = getSupabaseEnv();
   if (!url || !publishableKey) {
-    redirectToLogin(AUTH_ERROR_CODES.unavailable);
+    redirectToLogin("sign_in_required");
   }
 
   try {
     const supabase = await createClientOptional();
     if (!supabase) {
-      redirectToLogin(AUTH_ERROR_CODES.unavailable);
+      redirectToLogin("sign_in_required");
     }
 
     const {
@@ -108,33 +108,40 @@ export async function requireUser() {
 
     const resolved = resolveUserFromGetUser(user, error);
     if (resolved.unavailable) {
-      redirectToLogin(AUTH_ERROR_CODES.unavailable);
+      redirectToLogin("sign_in_required");
     }
 
     if (!resolved.user) {
-      redirectToLogin(AUTH_ERROR_CODES.auth);
+      redirectToLogin("session_ended");
     }
 
     authDebug("require-user", { userId: resolved.user.id });
     return resolved.user;
   } catch (error) {
     if (isServiceUnavailableError(error)) {
-      redirectToLogin(AUTH_ERROR_CODES.unavailable);
+      redirectToLogin("sign_in_required");
     }
-    redirectToLogin(AUTH_ERROR_CODES.auth);
+    redirectToLogin("session_ended");
   }
 }
 
 export async function requireProfile() {
   const user = await requireUser();
-  const profile = await getProfileByUserId(user.id);
+  let profile = await getProfileByUserId(user.id);
 
   if (!profile) {
-    authDebug("require-profile-failed", {
-      userId: user.id,
-      redirect: `/login?error=${AUTH_ERROR_CODES.profile}`,
-    });
-    redirectToLogin(AUTH_ERROR_CODES.profile);
+    profile = await ensureProfileForUser(user);
+    if (profile) {
+      authDebug("require-profile-repaired", {
+        userId: user.id,
+        profileId: profile.id,
+      });
+    }
+  }
+
+  if (!profile) {
+    authDebug("require-profile-failed", { userId: user.id });
+    redirectToLogin("sign_in_required");
   }
 
   authDebug("require-profile", {
@@ -162,7 +169,7 @@ export async function requireStaff() {
     redirect(PROTECTED_PATHS.client);
   }
   if (isDisabledStaffProfile(profile)) {
-    redirectToLogin(AUTH_ERROR_CODES.disabled);
+    redirectToLogin("sign_in_required");
   }
   return profile;
 }

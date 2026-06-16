@@ -6,8 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const EMAIL = process.argv[2] ?? "sumanth.reddy@ifranchise.in";
-const PASSWORD = process.argv[3] ?? "Sumanth@123";
+const EMAIL = process.argv[2] ?? process.env.TEST_LOGIN_EMAIL?.trim();
+const PASSWORD = process.argv[3] ?? process.env.TEST_LOGIN_PASSWORD?.trim();
 
 function loadEnv() {
   const raw = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
@@ -19,6 +19,11 @@ function loadEnv() {
 
 async function main() {
   loadEnv();
+  if (!EMAIL || !PASSWORD) {
+    console.error("Usage: npx tsx scripts/trace-profile-load.ts <email> <password>");
+    console.error("Or set TEST_LOGIN_EMAIL and TEST_LOGIN_PASSWORD.");
+    process.exit(1);
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const publishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY!;

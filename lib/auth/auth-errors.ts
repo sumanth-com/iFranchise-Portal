@@ -15,7 +15,6 @@ export const BLOCKING_AUTH_ERRORS = new Set<AuthErrorCode>([
   AUTH_ERROR_CODES.profile,
   AUTH_ERROR_CODES.disabled,
   AUTH_ERROR_CODES.unavailable,
-  AUTH_ERROR_CODES.expired,
 ]);
 
 export function isBlockingAuthError(
@@ -27,18 +26,17 @@ export function isBlockingAuthError(
   );
 }
 
+/** User-facing copy only — never expose technical failure details. */
 export function getAuthErrorMessage(error: string | null | undefined): string | null {
   switch (error) {
     case AUTH_ERROR_CODES.auth:
-      return "Authentication failed. Please try again.";
     case AUTH_ERROR_CODES.profile:
-      return "Profile record not found. Try repairing your account or contact support.";
     case AUTH_ERROR_CODES.disabled:
-      return "Your account is disabled. Contact an administrator.";
+      return "Please sign in to continue.";
     case AUTH_ERROR_CODES.unavailable:
-      return "Unable to connect to authentication service. Please try again.";
+      return "We are having trouble connecting. Please try again in a moment.";
     case AUTH_ERROR_CODES.expired:
-      return "Your session has expired. Please sign in again.";
+      return "Your session has ended. Sign in again to continue.";
     default:
       return null;
   }

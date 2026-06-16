@@ -7,12 +7,45 @@ import {
 } from "@/lib/admin-management/queries";
 import { resolveDisplayRole } from "@/lib/admin-management/permissions-display";
 import { getAdminLeads } from "@/lib/leads/queries";
+import { verifySupabaseConnectivity } from "@/lib/supabase/connectivity";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminDirectoryRow } from "@/types/admin-command-center";
 import type {
   OperationsActivityItem,
   OperationsDashboardData,
+  PlatformHealth,
 } from "@/types/admin-operations";
+
+const STORAGE_QUOTA_BYTES = 50 * 1024 * 1024 * 1024;
+
+function isToday(iso: string): boolean {
+  const date = new Date(iso);
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
+
+function formatStorageLabel(totalBytes: number): string {
+  const percent = Math.min(
+    100,
+    Math.round((totalBytes / STORAGE_QUOTA_BYTES) * 100),
+  );
+  if (totalBytes < 1024 * 1024 * 1024) {
+    const mb = Math.round(totalBytes / (1024 * 1024));
+    return `${mb} MB (${percent}%)`;
+  }
+  const gb = (totalBytes / (1024 * 1024 * 1024)).toFixed(1);
+  return `${gb} GB (${percent}%)`;
+}
+
+function formatResponseLabel(latencyMs: number | null): string {
+  if (latencyMs === null) return "—";
+  if (latencyMs < 1000) return `${latencyMs} ms`;
+  return `${(latencyMs / 1000).toFixed(1)} s`;
+}
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -112,21 +145,33 @@ function mergeActivity(
 
   for (const item of brandFeed) {
     let type: OperationsActivityItem["type"] = "brand_submitted";
-    if (item.type === "brand_approved") type = "brand_approved";
-    else if (item.type === "brand_rejected") type = "brand_rejected";
-    else if (item.type === "brand_published") type = "brand_published";
-    else if (
+    let title = "Brand submitted";
+
+    if (item.type === "brand_approved") {
+      type = "brand_approved";
+      title = "Brand approved";
+    } else if (item.type === "brand_published") {
+      type = "brand_published";
+      title = "Brand published";
+    } else if (
       item.type === "brand_submitted" ||
       item.type === "brand_resubmitted"
-    )
+    ) {
       type = "brand_submitted";
+      title =
+        item.type === "brand_resubmitted"
+          ? "Brand resubmitted"
+          : "Brand submitted";
+    } else if (item.type === "brand_rejected") {
+      continue;
+    }
 
     if (!item.timestamp) continue;
 
     items.push({
       id: item.id,
       type,
-      title: item.title,
+      title,
       description: item.description,
       timestamp: item.timestamp,
       href: `/admin/brands/${item.brandId}`,
@@ -134,83 +179,60 @@ function mergeActivity(
   }
 
   for (const log of logs) {
+    if (log.action.startsWith("bootstrap.")) {
+      continue;
+    }
+
     const meta = log.metadata ?? {};
     const email = typeof meta.email === "string" ? meta.email : null;
-    if (log.action === "admin.invited") {
+
+    if (log.action === "admin.invited" || log.action === "team.invite") {
       items.push({
         id: log.id,
-        type: "admin_invited",
-        title: "Admin invited",
+        type: "team_member_added",
+        title: "Team member added",
         description: email
-          ? `Invitation sent to ${email}`
-          : "New administrator invitation",
+          ? `${email} was invited to join the team`
+          : "A new team member was invited",
         timestamp: log.created_at,
-        href: "#admins",
+        href: "/admin/team",
       });
     } else if (log.action === "admin.enabled") {
       items.push({
         id: log.id,
-        type: "admin_created",
-        title: "Admin activated",
-        description: email ?? "Administrator account enabled",
+        type: "team_member_added",
+        title: "Team member added",
+        description: email
+          ? `${email} joined the operations team`
+          : "A team member was activated",
         timestamp: log.created_at,
-        href: "#admins",
+        href: "/admin/team",
       });
-    } else if (log.action === "admin.updated") {
+    } else if (log.action === "admin.welcome_notification") {
       items.push({
         id: log.id,
-        type: "admin_created",
-        title: "Admin updated",
-        description: email ?? "Administrator profile updated",
+        type: "notification_sent",
+        title: "Notification sent",
+        description: email
+          ? `Welcome message delivered to ${email}`
+          : "A platform notification was sent",
         timestamp: log.created_at,
-        href: "#admins",
-      });
-    } else if (log.action === "admin.role_changed") {
-      items.push({
-        id: log.id,
-        type: "admin_created",
-        title: "Admin role changed",
-        description: email ?? "Administrator role updated",
-        timestamp: log.created_at,
-        href: "#admins",
-      });
-    } else if (log.action === "admin.disabled") {
-      items.push({
-        id: log.id,
-        type: "admin_created",
-        title: "Admin suspended",
-        description: email ?? "Administrator account suspended",
-        timestamp: log.created_at,
-        href: "#admins",
-      });
-    } else if (log.action === "admin.deleted") {
-      items.push({
-        id: log.id,
-        type: "admin_created",
-        title: "Admin deleted",
-        description: email ?? "Administrator account removed",
-        timestamp: log.created_at,
-        href: "#admins",
-      });
-    } else if (log.action === "admin.password_reset_sent") {
-      items.push({
-        id: log.id,
-        type: "admin_created",
-        title: "Password reset sent",
-        description: email ?? "Administrator password reset",
-        timestamp: log.created_at,
-        href: "#admins",
+        href: "/admin/notifications",
       });
     } else if (
       log.action === "brand.approved" ||
-      log.action === "brand.rejected"
+      log.action === "brand.published"
     ) {
       items.push({
         id: log.id,
         type:
-          log.action === "brand.approved" ? "brand_approved" : "brand_rejected",
+          log.action === "brand.published"
+            ? "brand_published"
+            : "brand_approved",
         title:
-          log.action === "brand.approved" ? "Brand approved" : "Brand rejected",
+          log.action === "brand.published"
+            ? "Brand published"
+            : "Brand approved",
         description:
           typeof meta.businessName === "string"
             ? meta.businessName
@@ -251,6 +273,9 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
     { logs },
     brandsStatusResult,
     activityBrandsResult,
+    storageResult,
+    activeUsersResult,
+    connectivity,
   ] = await Promise.all([
     getAdminDashboardStats(),
     getAdminBrands({ pendingOnly: true, pageSize: 6 }),
@@ -265,6 +290,12 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
       )
       .order("updated_at", { ascending: false })
       .limit(40),
+    supabase.from("brand_assets").select("file_size"),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+    verifySupabaseConnectivity(),
   ]);
 
   if (statsError) {
@@ -313,7 +344,36 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
     (d) => !d.isInvitation && d.status === "suspended",
   ).length;
 
+  const newLeadsToday = leads.filter((l) => isToday(l.created_at)).length;
+  const totalStorageBytes = (storageResult.data ?? []).reduce(
+    (sum, row) => sum + (row.file_size ?? 0),
+    0,
+  );
+  const storageUsagePercent = Math.min(
+    100,
+    Math.round((totalStorageBytes / STORAGE_QUOTA_BYTES) * 100),
+  );
+
+  const platformHealth: PlatformHealth = {
+    marketplaceStatus:
+      statsError || !connectivity.ok ? "attention" : "healthy",
+    marketplaceLabel:
+      statsError || !connectivity.ok ? "Needs attention" : "Healthy",
+    storageUsagePercent,
+    storageLabel: formatStorageLabel(totalStorageBytes),
+    activeUsers: activeUsersResult.count ?? activeAdmins + stats.totalBrandOwners,
+    responseTimeMs: connectivity.latencyMs,
+    responseLabel: formatResponseLabel(connectivity.latencyMs),
+  };
+
   return {
+    executiveSummary: {
+      brandsUnderReview: stats.pendingReviews,
+      publishedBrands: stats.publishedBrands,
+      newLeadsToday,
+      activeTeamMembers: activeAdmins,
+    },
+    platformHealth,
     kpis: {
       totalBrands: {
         value: stats.totalBrands,
@@ -370,6 +430,21 @@ export async function getOperationsDashboardData(): Promise<OperationsDashboardD
 function emptyDashboard(error: string): OperationsDashboardData {
   const zero = { value: 0, changePercent: 0, href: "#" };
   return {
+    executiveSummary: {
+      brandsUnderReview: 0,
+      publishedBrands: 0,
+      newLeadsToday: 0,
+      activeTeamMembers: 0,
+    },
+    platformHealth: {
+      marketplaceStatus: "attention",
+      marketplaceLabel: "Needs attention",
+      storageUsagePercent: 0,
+      storageLabel: "—",
+      activeUsers: 0,
+      responseTimeMs: null,
+      responseLabel: "—",
+    },
     kpis: {
       totalBrands: zero,
       pendingReviews: zero,

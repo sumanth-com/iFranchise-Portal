@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { AUTH_ERROR_CODES } from "@/lib/auth/auth-errors";
 import {
-  DEV_AUTO_LOGIN,
+  getDevAutoLoginCredentials,
   isDevAutoLoginEnabled,
 } from "@/lib/auth/dev-credentials";
 import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
@@ -22,9 +22,14 @@ export async function GET(request: Request) {
     );
   }
 
+  const credentials = getDevAutoLoginCredentials();
+  if (!credentials) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: DEV_AUTO_LOGIN.email,
-    password: DEV_AUTO_LOGIN.password,
+    email: credentials.email,
+    password: credentials.password,
   });
 
   if (error || !data.user) {

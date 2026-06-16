@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { AuthLoadingScreen } from "@/components/auth/auth-loading-screen";
 import { exchangeCallbackCode } from "@/lib/auth/actions";
@@ -15,7 +15,6 @@ import { createClientOptional } from "@/lib/supabase/client";
  */
 export function AuthCallbackHandler() {
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState("Completing sign-in…");
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +22,9 @@ export function AuthCallbackHandler() {
     async function completeAuth() {
       const supabase = createClientOptional();
       if (!supabase) {
-        window.location.replace("/login?error=unavailable");
+        window.location.replace(
+          "/api/auth/redirect-login?notice=sign_in_required",
+        );
         return;
       }
 
@@ -36,7 +37,6 @@ export function AuthCallbackHandler() {
       const destination = isSafeRedirectPath(next) ? next : "/login";
 
       if (accessToken && refreshToken) {
-        setStatus("Setting session from recovery link…");
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -50,24 +50,37 @@ export function AuthCallbackHandler() {
             code: error.code,
             status: error.status,
           });
-          window.location.replace("/login?error=auth");
+          window.location.replace(
+            "/api/auth/redirect-login?notice=sign_in_required",
+          );
           return;
         }
 
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
         window.location.replace(destination);
         return;
       }
 
       if (code) {
-        setStatus("Exchanging authorization code…");
         const result = await exchangeCallbackCode(code, next);
 
         if (cancelled) return;
 
         if (!result.ok) {
-          console.error("[auth-callback:code-exchange]", { error: result.error });
-          window.location.replace(`/login?error=${result.error}`);
+          console.error("[auth-callback:code-exchange]", {
+            error: result.error,
+          });
+          const notice =
+            result.error === "unavailable"
+              ? "sign_in_required"
+              : "sign_in_required";
+          window.location.replace(
+            `/api/auth/redirect-login?notice=${notice}`,
+          );
           return;
         }
 
@@ -79,7 +92,9 @@ export function AuthCallbackHandler() {
         search: window.location.search,
         hasHash: Boolean(hash),
       });
-      window.location.replace("/login?error=auth");
+      window.location.replace(
+        "/api/auth/redirect-login?notice=sign_in_required",
+      );
     }
 
     void completeAuth();
@@ -89,10 +104,5 @@ export function AuthCallbackHandler() {
     };
   }, [searchParams]);
 
-  return (
-    <AuthLoadingScreen
-      message={status}
-      className="flex min-h-[60dvh] w-full flex-col items-center justify-center gap-6 px-6 py-12"
-    />
-  );
+  return <AuthLoadingScreen message="Securing your workspace…" />;
 }

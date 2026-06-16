@@ -1,40 +1,42 @@
 "use client";
 
-import { OperationsActivityFeed } from "@/components/admin-command-center/operations-activity-feed";
-import { OperationsAdminPanel } from "@/components/admin-command-center/operations-admin-panel";
-import { OperationsAdminStats } from "@/components/admin-command-center/operations-admin-stats";
+import { ExecutivePlatformHealth } from "@/components/admin-command-center/executive-platform-health";
+import { ExecutivePriorityActions } from "@/components/admin-command-center/executive-priority-actions";
+import { ExecutiveSummaryCards } from "@/components/admin-command-center/executive-summary-cards";
+import { MarketplaceActivityTimeline } from "@/components/admin-command-center/marketplace-activity-timeline";
 import { OperationsOverview } from "@/components/admin-command-center/operations-overview";
+import { normalizeOperationsDashboardData } from "@/lib/admin-management/normalize-dashboard-data";
 import { useAdminStaffRealtime } from "@/lib/hooks/use-admin-staff-realtime";
 import type { OperationsDashboardData } from "@/types/admin-operations";
 
 type AdminCommandCenterProps = {
   data: OperationsDashboardData;
-  currentUserId: string;
 };
 
-export function AdminCommandCenter({
-  data,
-  currentUserId,
-}: AdminCommandCenterProps) {
+export function AdminCommandCenter({ data }: AdminCommandCenterProps) {
   useAdminStaffRealtime();
 
-  if (data.error) {
+  const dashboard = normalizeOperationsDashboardData(data);
+
+  if (dashboard.error) {
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-        {data.error}
+        We could not load command center data. Please refresh the page.
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-6 pb-8">
+    <div className="w-full space-y-8 pb-8">
       <OperationsOverview />
 
-      <OperationsAdminStats stats={data.adminStats} />
+      <ExecutiveSummaryCards summary={dashboard.executiveSummary} />
 
-      <OperationsActivityFeed items={data.activity} />
+      <ExecutivePriorityActions />
 
-      <OperationsAdminPanel rows={data.directory} currentUserId={currentUserId} />
+      <MarketplaceActivityTimeline items={dashboard.activity} />
+
+      <ExecutivePlatformHealth health={dashboard.platformHealth} />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { AdminCommandCenter } from "@/components/admin-command-center/admin-command-center";
 import { requireSuperAdmin } from "@/lib/auth/session";
 import { getOperationsDashboardData } from "@/lib/admin-management/operations-dashboard";
+import { normalizeOperationsDashboardData } from "@/lib/admin-management/normalize-dashboard-data";
 
 export default async function AdminManagementPage() {
-  const profile = await requireSuperAdmin();
-  const data = await getOperationsDashboardData();
+  await requireSuperAdmin();
+  const data = normalizeOperationsDashboardData(await getOperationsDashboardData());
 
-  return <AdminCommandCenter data={data} currentUserId={profile.id} />;
+  return <AdminCommandCenter data={data} />;
 }

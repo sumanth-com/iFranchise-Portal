@@ -11,7 +11,8 @@
     "db:prove": "tsx scripts/prove-rls-and-e2e.ts",
     "db:verify": "tsx scripts/verify-production-db.ts",
     "db:apply-workflow": "tsx scripts/apply-workflow-migrations.ts",
-    "workflow:validate": "tsx scripts/validate-workflow-e2e.ts"
+    "workflow:validate": "tsx scripts/validate-workflow-e2e.ts",
+    "bootstrap:super-admin": "tsx scripts/bootstrap-super-admin.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

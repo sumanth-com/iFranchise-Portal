@@ -4,7 +4,7 @@ import { Suspense, useState, type ReactNode } from "react";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
-import { AuthSessionGuard } from "@/components/auth/auth-session-guard";
+import { AuthManager } from "@/components/auth/auth-manager";
 import { MobileBottomNav } from "@/components/dashboard/client/mobile-bottom-nav";
 import { MobileDrawer } from "@/components/dashboard/client/mobile-drawer";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -35,7 +35,7 @@ export function AdminShell({
 
   return (
     <ToastProvider>
-      <AuthSessionGuard />
+      <AuthManager />
       <div
         data-dashboard="admin"
         className="flex h-dvh overflow-hidden bg-[#F8FAFC] text-slate-900"

@@ -6,15 +6,16 @@ import {
   applyNoStoreHeaders,
   clearSupabaseAuthCookies,
 } from "@/lib/auth/cookies";
+import { setAuthNoticeCookie } from "@/lib/auth/notice";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { fetchWithTimeoutServer } from "@/lib/supabase/fetch-server";
 
 async function buildLogoutResponse(request: NextRequest) {
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("logged_out", "1");
 
   const response = NextResponse.redirect(loginUrl);
   applyNoStoreHeaders(response);
+  setAuthNoticeCookie(response, "signed_out");
 
   const { url, publishableKey } = getSupabaseEnv();
   if (!url || !publishableKey) {

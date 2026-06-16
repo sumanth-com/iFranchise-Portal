@@ -7,7 +7,7 @@ import { isServiceUnavailableError } from "@/lib/auth/resolve-auth";
 /** Never surface raw infrastructure errors like "fetch failed" to users. */
 export function humanizeAuthError(error: unknown): string {
   if (isServiceUnavailableError(error)) {
-    return "Unable to connect to authentication service. Please try again.";
+    return getAuthErrorMessage(AUTH_ERROR_CODES.unavailable)!;
   }
 
   const message =
@@ -28,14 +28,7 @@ export function humanizeAuthError(error: unknown): string {
     lower.includes("enotfound") ||
     lower.includes("econnreset")
   ) {
-    return "Network connection issue. Please check your connection and try again.";
-  }
-
-  if (
-    lower.includes("profile") &&
-    (lower.includes("not found") || lower.includes("could not be loaded"))
-  ) {
-    return "Profile record not found.";
+    return "We are having trouble connecting. Please try again in a moment.";
   }
 
   if (lower.includes("invalid login credentials")) {
@@ -57,28 +50,23 @@ export function humanizeAuthError(error: unknown): string {
     return "Authentication is not configured. Contact support.";
   }
 
+  if (
+    lower.includes("profile") ||
+    lower.includes("authentication failed") ||
+    lower.includes("session")
+  ) {
+    return "Please sign in to continue.";
+  }
+
   if (message.trim()) {
     return message;
   }
 
-  return "Authentication failed. Please try again.";
+  return "Please sign in to continue.";
 }
 
-export function profileLoadErrorMessage(reason: string | null): string {
-  if (!reason) {
-    return "Profile record not found.";
-  }
-
-  if (isServiceUnavailableError({ message: reason })) {
-    return "Unable to connect to authentication service. Please try again.";
-  }
-
-  const lower = reason.toLowerCase();
-  if (lower.includes("not found") || lower.includes("no profile")) {
-    return "Profile record not found.";
-  }
-
-  return humanizeAuthError({ message: reason });
+export function profileLoadErrorMessage(_reason: string | null): string {
+  return "Please sign in to continue.";
 }
 
 export function unavailableAuthState() {

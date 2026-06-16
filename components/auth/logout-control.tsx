@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { AuthLoadingScreen } from "@/components/auth/auth-loading-screen";
 import { clearClientAuthStorage } from "@/lib/auth/clear-client-auth";
 import { createClientOptional } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -44,8 +45,15 @@ export function LogoutControl({
   }
 
   return (
-    <form onSubmit={handleLogout} className={cn(className)}>
-      {children}
-    </form>
+    <>
+      {pending ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white/90 backdrop-blur-sm">
+          <AuthLoadingScreen message="Signing you out…" />
+        </div>
+      ) : null}
+      <form onSubmit={handleLogout} className={cn(className)}>
+        {children}
+      </form>
+    </>
   );
 }

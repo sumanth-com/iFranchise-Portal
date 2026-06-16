@@ -8,6 +8,23 @@ export type OperationsKpi = {
   href: string;
 };
 
+export type ExecutiveSummary = {
+  brandsUnderReview: number;
+  publishedBrands: number;
+  newLeadsToday: number;
+  activeTeamMembers: number;
+};
+
+export type PlatformHealth = {
+  marketplaceStatus: "healthy" | "attention";
+  marketplaceLabel: string;
+  storageUsagePercent: number;
+  storageLabel: string;
+  activeUsers: number;
+  responseTimeMs: number | null;
+  responseLabel: string;
+};
+
 export type OperationsActivityItem = {
   id: string;
   type:
@@ -16,8 +33,8 @@ export type OperationsActivityItem = {
     | "brand_rejected"
     | "brand_published"
     | "lead_received"
-    | "admin_invited"
-    | "admin_created";
+    | "team_member_added"
+    | "notification_sent";
   title: string;
   description: string;
   timestamp: string;
@@ -40,6 +57,8 @@ export type BrandPerformance = {
 };
 
 export type OperationsDashboardData = {
+  executiveSummary: ExecutiveSummary;
+  platformHealth: PlatformHealth;
   kpis: {
     totalBrands: OperationsKpi;
     pendingReviews: OperationsKpi;

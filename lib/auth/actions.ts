@@ -9,13 +9,11 @@ import {
 } from "@/lib/auth/paths";
 import {
   AUTH_ERROR_CODES,
-  getAuthErrorMessage,
 } from "@/lib/auth/auth-errors";
 import { ensureProfileForUser } from "@/lib/auth/ensure-profile";
 import { touchLastLogin } from "@/lib/auth/touch-last-login";
 import {
   humanizeAuthError,
-  profileLoadErrorMessage,
   unavailableAuthState,
 } from "@/lib/auth/humanize-error";
 import { authDebug, authProfileTrace } from "@/lib/auth/profile";
@@ -125,7 +123,7 @@ export async function login(
     }
 
     if (!data.user) {
-      return { error: "Authentication failed. Please try again.", message: null };
+      return { error: "Please sign in to continue.", message: null };
     }
 
     authDebug("login-auth-ok", { userId: data.user.id });
@@ -140,7 +138,7 @@ export async function login(
       );
       authDebug("login-profile-missing", { userId: data.user.id });
       return {
-        error: getAuthErrorMessage(AUTH_ERROR_CODES.profile),
+        error: "Please sign in to continue.",
         message: null,
       };
     }
@@ -318,7 +316,7 @@ export async function repairAccount(
 
     if (!user) {
       return {
-        error: getAuthErrorMessage(AUTH_ERROR_CODES.auth),
+        error: "Please sign in to continue.",
         message: null,
       };
     }
@@ -326,7 +324,7 @@ export async function repairAccount(
     const profile = await ensureProfileForUser(user, supabase);
     if (!profile) {
       return {
-        error: profileLoadErrorMessage("Profile record not found."),
+        error: "Please sign in to continue.",
         message: null,
       };
     }

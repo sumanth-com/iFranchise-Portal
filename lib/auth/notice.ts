@@ -6,7 +6,8 @@ export const AUTH_NOTICE_COOKIE = "if_auth_notice";
 export type AuthNoticeKind =
   | "session_ended"
   | "sign_in_required"
-  | "signed_out";
+  | "signed_out"
+  | "password_updated";
 
 export function getAuthNoticeMessage(
   kind: AuthNoticeKind | null | undefined,
@@ -18,6 +19,8 @@ export function getAuthNoticeMessage(
       return "Please sign in to continue.";
     case "signed_out":
       return "You have been signed out successfully.";
+    case "password_updated":
+      return "Password updated successfully. Please sign in.";
     default:
       return null;
   }
@@ -59,7 +62,8 @@ export function readAuthNoticeCookie(
   if (
     value === "session_ended" ||
     value === "sign_in_required" ||
-    value === "signed_out"
+    value === "signed_out" ||
+    value === "password_updated"
   ) {
     return value;
   }

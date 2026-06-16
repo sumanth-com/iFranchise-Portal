@@ -2,6 +2,7 @@ export const AUTH_PATHS = {
   login: "/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
 } as const;
 
 export const PROTECTED_PATHS = {
@@ -24,6 +25,8 @@ export function isSuperAdminOnlyPath(pathname: string): boolean {
   );
 }
 
+import { isRecoveryPath } from "@/lib/auth/recovery";
+
 export function isAuthPath(pathname: string): boolean {
   return (
     pathname === AUTH_PATHS.login ||
@@ -31,6 +34,8 @@ export function isAuthPath(pathname: string): boolean {
     pathname === AUTH_PATHS.forgotPassword
   );
 }
+
+export { isRecoveryPath };
 
 export function isProtectedPath(pathname: string): boolean {
   return (

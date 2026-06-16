@@ -3,6 +3,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { buildPasswordResetRedirectUrl } from "@/lib/auth/recovery";
+import { validatePasswordPolicy } from "@/lib/auth/password-policy";
 import {
   getRedirectPathForRole,
   isSafeRedirectPath,
@@ -268,7 +270,7 @@ export async function forgotPassword(
 
     const origin = await getOrigin();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/auth/callback?next=/login`,
+      redirectTo: buildPasswordResetRedirectUrl(origin),
     });
 
     if (error) {
@@ -277,8 +279,7 @@ export async function forgotPassword(
 
     return {
       error: null,
-      message:
-        "If an account exists for that email, a password reset link has been sent.",
+      message: "Password reset link sent. Please check your inbox.",
     };
   } catch (error) {
     if (isServiceUnavailableError(error)) {
@@ -349,6 +350,132 @@ export async function repairAccount(
 
 export async function logout() {
   redirect("/api/auth/logout");
+}
+
+export type RecoveryExchangeResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Exchange a PKCE recovery code and establish a session for password reset only.
+ * Does not require profile or role redirects.
+ */
+export async function exchangeRecoveryCode(
+  code: string,
+): Promise<RecoveryExchangeResult> {
+  const trimmed = code.trim();
+  if (!trimmed) {
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
+
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+  }
+
+  try {
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+
+    const { error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(trimmed);
+
+    if (exchangeError) {
+      authDebug("recovery-code-exchange-failed", {
+        message: exchangeError.message,
+        code: exchangeError.code,
+      });
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    authDebug("recovery-code-exchange-ok", { userId: user.id });
+    return { ok: true };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
+}
+
+export async function resetPassword(
+  _prevState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (!password || !confirmPassword) {
+    return { error: "Please enter and confirm your new password.", message: null };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match.", message: null };
+  }
+
+  const policyError = validatePasswordPolicy(password);
+  if (policyError) {
+    return { error: policyError, message: null };
+  }
+
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return preflight;
+  }
+
+  try {
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return envErrorState();
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        error: "This reset link has expired. Please request a new one.",
+        message: null,
+      };
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+
+    if (updateError) {
+      authDebug("reset-password-update-failed", {
+        message: updateError.message,
+        code: updateError.code,
+      });
+      return { error: humanizeAuthError(updateError), message: null };
+    }
+
+    await supabase.auth.signOut({ scope: "global" });
+
+    authDebug("reset-password-success", { userId: user.id });
+
+    return {
+      error: null,
+      message: "password_updated",
+    };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return unavailableAuthState();
+    }
+    throw error;
+  }
 }
 
 export type CallbackExchangeResult =

@@ -138,10 +138,16 @@ export function AuthExperience({
             <div className="mt-5">
               <AuthAlert
                 error={
-                  noticeMessage.includes("signed out") ? null : noticeMessage
+                  noticeMessage.includes("signed out") ||
+                  noticeMessage.includes("Password updated")
+                    ? null
+                    : noticeMessage
                 }
                 message={
-                  noticeMessage.includes("signed out") ? noticeMessage : null
+                  noticeMessage.includes("signed out") ||
+                  noticeMessage.includes("Password updated")
+                    ? noticeMessage
+                    : null
                 }
               />
             </div>

@@ -18,6 +18,7 @@ import {
   getRedirectPathForRole,
   isAuthPath,
   isProtectedPath,
+  isRecoveryPath,
   isSuperAdminOnlyPath,
   PROTECTED_PATHS,
 } from "@/lib/auth/paths";
@@ -228,6 +229,9 @@ export async function updateSession(request: NextRequest) {
 
   // No session cookies — skip Supabase auth call entirely.
   if (!hasAuthCookies) {
+    if (isRecoveryPath(pathname)) {
+      return getResponse();
+    }
     if (isProtectedPath(pathname)) {
       return redirectToLogin(request, "sign_in_required", pathname);
     }
@@ -297,6 +301,11 @@ export async function updateSession(request: NextRequest) {
     if (isProtectedPath(pathname)) {
       return redirectToLogin(request, "sign_in_required", pathname);
     }
+    return getResponse();
+  }
+
+  // --- Password recovery: never redirect away or block ---
+  if (isRecoveryPath(pathname)) {
     return getResponse();
   }
 

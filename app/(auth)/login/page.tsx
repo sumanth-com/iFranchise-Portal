@@ -29,6 +29,7 @@ type LoginPageProps = {
     logged_out?: string;
     ended?: string;
     signin?: string;
+    updated?: string;
   }>;
 };
 
@@ -38,7 +39,8 @@ async function readNotice(): Promise<AuthNoticeKind | null> {
   if (
     value === "session_ended" ||
     value === "sign_in_required" ||
-    value === "signed_out"
+    value === "signed_out" ||
+    value === "password_updated"
   ) {
     return value;
   }
@@ -56,6 +58,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const cookieNotice = await readNotice();
   const legacyNotice = legacyErrorToNotice(params.error);
+  const cookieStore = await cookies();
+  const recoveryFlow = cookieStore.get("if_auth_recovery")?.value === "1";
   const urlNotice: AuthNoticeKind | null =
     params.ended === "1"
       ? "session_ended"
@@ -63,7 +67,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ? "sign_in_required"
         : params.logged_out === "1"
           ? "signed_out"
-          : null;
+          : params.updated === "1"
+            ? "password_updated"
+            : null;
 
   const notice = cookieNotice ?? legacyNotice ?? urlNotice;
   let noticeMessage = getAuthNoticeMessage(notice);
@@ -102,6 +108,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   });
 
   if (authState.status === "authenticated" && authState.profile) {
+    if (recoveryFlow) {
+      redirect("/reset-password");
+    }
+
     const destination = isSafeRedirectPath(redirectTo)
       ? redirectTo
       : getRedirectPathForRole(authState.profile.role);

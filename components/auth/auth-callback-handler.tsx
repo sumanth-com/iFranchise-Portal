@@ -4,9 +4,26 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 import { AuthLoadingScreen } from "@/components/auth/auth-loading-screen";
-import { exchangeCallbackCode } from "@/lib/auth/actions";
+import {
+  exchangeCallbackCode,
+  exchangeRecoveryCode,
+} from "@/lib/auth/actions";
+import {
+  isRecoveryCallbackType,
+  RECOVERY_CALLBACK_NEXT,
+} from "@/lib/auth/recovery";
 import { isSafeRedirectPath } from "@/lib/auth/paths";
 import { createClientOptional } from "@/lib/supabase/client";
+
+const RECOVERY_COOKIE = "if_auth_recovery";
+
+function markRecoveryFlow() {
+  document.cookie = `${RECOVERY_COOKIE}=1; path=/; max-age=3600; SameSite=Lax`;
+}
+
+function isRecoveryNext(next: string | null): boolean {
+  return next === RECOVERY_CALLBACK_NEXT || next === "/reset-password";
+}
 
 /**
  * Handles Supabase redirects that deliver session tokens in the URL hash
@@ -22,9 +39,7 @@ export function AuthCallbackHandler() {
     async function completeAuth() {
       const supabase = createClientOptional();
       if (!supabase) {
-        window.location.replace(
-          "/api/auth/redirect-login?notice=sign_in_required",
-        );
+        window.location.replace("/forgot-password");
         return;
       }
 
@@ -34,7 +49,9 @@ export function AuthCallbackHandler() {
       const hashParams = new URLSearchParams(hash);
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
-      const destination = isSafeRedirectPath(next) ? next : "/login";
+      const callbackType = hashParams.get("type");
+      const isRecovery =
+        isRecoveryCallbackType(callbackType) || isRecoveryNext(next);
 
       if (accessToken && refreshToken) {
         const { error } = await supabase.auth.setSession({
@@ -50,9 +67,7 @@ export function AuthCallbackHandler() {
             code: error.code,
             status: error.status,
           });
-          window.location.replace(
-            "/api/auth/redirect-login?notice=sign_in_required",
-          );
+          window.location.replace("/forgot-password");
           return;
         }
 
@@ -61,26 +76,42 @@ export function AuthCallbackHandler() {
           "",
           window.location.pathname + window.location.search,
         );
+
+        if (isRecovery) {
+          markRecoveryFlow();
+          window.location.replace(RECOVERY_CALLBACK_NEXT);
+          return;
+        }
+
+        const destination = isSafeRedirectPath(next) ? next : "/login";
         window.location.replace(destination);
         return;
       }
 
       if (code) {
+        if (isRecovery) {
+          const result = await exchangeRecoveryCode(code);
+
+          if (cancelled) return;
+
+          if (!result.ok) {
+            console.error("[auth-callback:recovery-exchange]", result);
+            window.location.replace("/forgot-password");
+            return;
+          }
+
+          markRecoveryFlow();
+          window.location.replace(RECOVERY_CALLBACK_NEXT);
+          return;
+        }
+
         const result = await exchangeCallbackCode(code, next);
 
         if (cancelled) return;
 
         if (!result.ok) {
-          console.error("[auth-callback:code-exchange]", {
-            error: result.error,
-          });
-          const notice =
-            result.error === "unavailable"
-              ? "sign_in_required"
-              : "sign_in_required";
-          window.location.replace(
-            `/api/auth/redirect-login?notice=${notice}`,
-          );
+          console.error("[auth-callback:code-exchange]", { error: result.error });
+          window.location.replace("/forgot-password");
           return;
         }
 
@@ -92,9 +123,7 @@ export function AuthCallbackHandler() {
         search: window.location.search,
         hasHash: Boolean(hash),
       });
-      window.location.replace(
-        "/api/auth/redirect-login?notice=sign_in_required",
-      );
+      window.location.replace("/forgot-password");
     }
 
     void completeAuth();
@@ -104,5 +133,5 @@ export function AuthCallbackHandler() {
     };
   }, [searchParams]);
 
-  return <AuthLoadingScreen message="Securing your workspace…" />;
+  return <AuthLoadingScreen message="Preparing password reset…" />;
 }

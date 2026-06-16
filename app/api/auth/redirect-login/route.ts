@@ -15,6 +15,7 @@ const VALID_NOTICES = new Set<AuthNoticeKind>([
   "session_ended",
   "sign_in_required",
   "signed_out",
+  "password_updated",
 ]);
 
 /**

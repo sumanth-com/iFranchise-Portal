@@ -16,6 +16,7 @@ import {
   ADMIN_PERMISSION_KEYS,
 } from "@/lib/admin-management/permission-keys";
 import { requireSuperAdmin } from "@/lib/auth/session";
+import { buildPasswordResetRedirectUrl } from "@/lib/auth/recovery";
 import { logActivity } from "@/lib/team/activity";
 import {
   getAdminPermissions,
@@ -326,7 +327,7 @@ export async function sendAdminPasswordReset(
 
   const origin = await getOrigin();
   const { error } = await serviceClient.auth.resetPasswordForEmail(member.email, {
-    redirectTo: `${origin}/auth/callback?next=/login`,
+    redirectTo: buildPasswordResetRedirectUrl(origin),
   });
 
   if (error) {

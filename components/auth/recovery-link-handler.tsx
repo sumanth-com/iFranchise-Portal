@@ -12,14 +12,15 @@ import { parseRecoveryParams } from "@/lib/auth/recovery";
 import { markRecoveryFlow } from "@/lib/auth/recovery-cookie";
 
 /**
- * On /login (or /), detect recovery tokens in the URL and route to reset-password
- * instead of showing a stale "session ended" message.
+ * On /login or /, detect recovery tokens and forward to /reset-password
+ * without showing session-expired errors.
  */
 export function RecoveryLinkHandler() {
   useEffect(() => {
     const params = parseRecoveryParams(
       window.location.search,
       window.location.hash,
+      window.location.pathname,
     );
 
     const hasTokens =
@@ -34,9 +35,20 @@ export function RecoveryLinkHandler() {
     let cancelled = false;
 
     async function handleRecoveryLink() {
+      const pathname = window.location.pathname;
+
+      if (pathname !== getRecoveryDestination()) {
+        const destination = new URL(getRecoveryDestination(), window.location.origin);
+        destination.search = window.location.search;
+        destination.hash = window.location.hash;
+        window.location.replace(destination.toString());
+        return;
+      }
+
       const result = await establishRecoverySession(
         window.location.search,
         window.location.hash,
+        pathname,
       );
 
       if (cancelled) return;
@@ -46,10 +58,7 @@ export function RecoveryLinkHandler() {
       if (result.ok) {
         markRecoveryFlow();
         window.location.replace(getRecoveryDestination());
-        return;
       }
-
-      window.location.replace("/forgot-password");
     }
 
     void handleRecoveryLink();
@@ -61,7 +70,11 @@ export function RecoveryLinkHandler() {
 
   const params =
     typeof window !== "undefined"
-      ? parseRecoveryParams(window.location.search, window.location.hash)
+      ? parseRecoveryParams(
+          window.location.search,
+          window.location.hash,
+          window.location.pathname,
+        )
       : null;
 
   const hasRecoveryIntent =
@@ -75,5 +88,5 @@ export function RecoveryLinkHandler() {
     return null;
   }
 
-  return <AuthLoadingScreen message="Preparing password reset…" />;
+  return <AuthLoadingScreen message="Verifying your reset link…" />;
 }

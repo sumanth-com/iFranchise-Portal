@@ -7,24 +7,38 @@ Apply these settings in **Supabase Dashboard → Authentication**.
 Add every environment:
 
 ```
-http://localhost:3000/auth/callback
 http://localhost:3000/reset-password
-https://YOUR-PRODUCTION-DOMAIN/auth/callback
+https://ifranchise-portal.vercel.app/reset-password
 https://YOUR-PRODUCTION-DOMAIN/reset-password
-https://*-YOUR-VERCEL-TEAM.vercel.app/auth/callback
 https://*-YOUR-VERCEL-TEAM.vercel.app/reset-password
 ```
 
-For Vercel preview deployments, add your preview URL pattern or each preview domain.
+Legacy callback (optional, for older emails):
+
+```
+http://localhost:3000/auth/callback
+https://ifranchise-portal.vercel.app/auth/callback
+```
 
 ## Site URL
 
 | Environment | Site URL |
 |-------------|----------|
 | Local | `http://localhost:3000` |
-| Production | `https://YOUR-PRODUCTION-DOMAIN` |
+| Production | `https://ifranchise-portal.vercel.app` |
 
 Set `NEXT_PUBLIC_SITE_URL` in Vercel to the production domain (used as fallback for `getOrigin()`).
+
+## resetPasswordForEmail redirectTo
+
+The app sends users **directly** to `/reset-password`:
+
+| Environment | redirectTo |
+|-------------|------------|
+| Local | `http://localhost:3000/reset-password` |
+| Production | `https://ifranchise-portal.vercel.app/reset-password` |
+
+Configured via `buildPasswordResetRedirectUrl()` in `lib/auth/recovery.ts`.
 
 ## Recovery email template
 
@@ -35,18 +49,8 @@ Set `NEXT_PUBLIC_SITE_URL` in Vercel to the production domain (used as fallback 
 
 ## Flow
 
-1. User requests reset → email sent with link to `/auth/callback?next=/reset-password`
-2. Callback (or `/login` / `/` with tokens) establishes recovery session → `/reset-password`
-3. User sets new password → redirected to `/login` with success message
-
-If Supabase **Site URL** is the app root (`https://your-domain.com`), recovery links that land on `/` are automatically forwarded to `/auth/callback` with tokens preserved.
-
-## Token handling
-
-The app accepts recovery sessions via:
-
-- URL hash (`#access_token=…&type=recovery`) — implicit flow
-- `?code=…` — PKCE (browser or server exchange)
-- `?token_hash=…&type=recovery` — OTP verify
+1. User requests reset → email sent with link to `/reset-password`
+2. `/reset-password` verifies the recovery token and shows the reset form
+3. User sets a new password → success screen → redirect to `/login` after 3 seconds
 
 Passwords are managed only through Supabase Auth — never stored in application code.

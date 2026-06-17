@@ -444,7 +444,7 @@ export async function logout() {
 
 export type RecoveryExchangeResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string | null; message?: string | null };
 
 export async function verifyRecoveryOtp(
   tokenHash: string,
@@ -454,7 +454,7 @@ export async function verifyRecoveryOtp(
     return { ok: false, error: AUTH_ERROR_CODES.auth };
   }
 
-  const preflight = await preflightAuth();
+  const preflight = await preflightAuth({ requireConnectivity: false });
   if (preflight) {
     return { ok: false, error: AUTH_ERROR_CODES.unavailable };
   }
@@ -475,7 +475,12 @@ export async function verifyRecoveryOtp(
         message: error.message,
         code: error.code,
       });
-      return { ok: false, error: AUTH_ERROR_CODES.auth };
+      return {
+        ok: false,
+        error: AUTH_ERROR_CODES.auth,
+        code: error.code,
+        message: error.message,
+      };
     }
 
     const {
@@ -509,7 +514,7 @@ export async function exchangeRecoveryCode(
     return { ok: false, error: AUTH_ERROR_CODES.auth };
   }
 
-  const preflight = await preflightAuth();
+  const preflight = await preflightAuth({ requireConnectivity: false });
   if (preflight) {
     return { ok: false, error: AUTH_ERROR_CODES.unavailable };
   }
@@ -528,7 +533,12 @@ export async function exchangeRecoveryCode(
         message: exchangeError.message,
         code: exchangeError.code,
       });
-      return { ok: false, error: AUTH_ERROR_CODES.auth };
+      return {
+        ok: false,
+        error: AUTH_ERROR_CODES.auth,
+        code: exchangeError.code,
+        message: exchangeError.message,
+      };
     }
 
     const {

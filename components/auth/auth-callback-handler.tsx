@@ -8,13 +8,15 @@ import {
   establishRecoverySession,
   stripRecoveryParamsFromUrl,
 } from "@/lib/auth/recovery-session";
-import { isRecoveryNext, RECOVERY_CALLBACK_NEXT } from "@/lib/auth/recovery";
-import { markRecoveryFlow } from "@/lib/auth/recovery-cookie";
+import {
+  isRecoveryNext,
+  RECOVERY_CALLBACK_NEXT,
+  RECOVERY_PATHS,
+} from "@/lib/auth/recovery";
 
 /**
- * Handles Supabase redirects that deliver session tokens in the URL hash
- * (#access_token=...) — invisible to server route handlers.
- * Also supports ?code= PKCE and ?token_hash= recovery OTP.
+ * Legacy /auth/callback handler for OAuth and older recovery links.
+ * Recovery always ends on /reset-password — never /forgot-password.
  */
 export function AuthCallbackHandler() {
   const searchParams = useSearchParams();
@@ -30,6 +32,7 @@ export function AuthCallbackHandler() {
         const result = await establishRecoverySession(
           window.location.search,
           window.location.hash,
+          RECOVERY_PATHS.callback,
         );
 
         if (cancelled) return;
@@ -37,12 +40,12 @@ export function AuthCallbackHandler() {
         stripRecoveryParamsFromUrl();
 
         if (!result.ok) {
-          console.error("[auth-callback:recovery]", result);
-          window.location.replace("/forgot-password");
+          const url = new URL(RECOVERY_CALLBACK_NEXT, window.location.origin);
+          url.searchParams.set("recovery_error", result.reason);
+          window.location.replace(url.toString());
           return;
         }
 
-        markRecoveryFlow();
         window.location.replace(RECOVERY_CALLBACK_NEXT);
         return;
       }
@@ -56,7 +59,7 @@ export function AuthCallbackHandler() {
 
         if (!result.ok) {
           console.error("[auth-callback:code-exchange]", { error: result.error });
-          window.location.replace("/forgot-password");
+          window.location.replace("/login?signin=1");
           return;
         }
 
@@ -68,7 +71,7 @@ export function AuthCallbackHandler() {
         search: window.location.search,
         hash: Boolean(window.location.hash),
       });
-      window.location.replace("/forgot-password");
+      window.location.replace(RECOVERY_CALLBACK_NEXT);
     }
 
     void completeAuth();
@@ -78,5 +81,5 @@ export function AuthCallbackHandler() {
     };
   }, [searchParams]);
 
-  return <AuthLoadingScreen message="Preparing password reset…" />;
+  return <AuthLoadingScreen message="Verifying your reset link…" />;
 }

@@ -1,25 +1,28 @@
 "use client";
 
+import { exchangeRecoveryCode, verifyRecoveryOtp } from "@/lib/auth/actions";
 import {
-  exchangeRecoveryCode,
-  verifyRecoveryOtp,
-} from "@/lib/auth/actions";
-import { parseRecoveryParams } from "@/lib/auth/recovery";
+  classifyRecoveryError,
+  parseRecoveryParams,
+  type RecoveryErrorReason,
+} from "@/lib/auth/recovery";
 import { markRecoveryFlow } from "@/lib/auth/recovery-cookie";
 import { createClientOptional } from "@/lib/supabase/client";
 
 export type RecoverySessionResult =
   | { ok: true }
-  | { ok: false; reason: "invalid" | "unavailable" };
+  | { ok: false; reason: RecoveryErrorReason };
 
 /**
  * Establish a Supabase recovery session from URL tokens (hash, PKCE code, or OTP).
+ * Each token is exchanged exactly once to avoid rate-limit errors.
  */
 export async function establishRecoverySession(
   search = "",
   hash = "",
+  pathname = "",
 ): Promise<RecoverySessionResult> {
-  const params = parseRecoveryParams(search, hash);
+  const params = parseRecoveryParams(search, hash, pathname);
 
   const hasTokens =
     Boolean(params.code) ||
@@ -35,7 +38,7 @@ export async function establishRecoverySession(
       markRecoveryFlow();
       return { ok: true };
     }
-    return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "missing" };
   }
 
   const supabase = createClientOptional();
@@ -51,7 +54,10 @@ export async function establishRecoverySession(
 
     if (error) {
       console.error("[recovery:setSession]", error.message);
-      return { ok: false, reason: "invalid" };
+      return {
+        ok: false,
+        reason: classifyRecoveryError(error.code, error.message),
+      };
     }
 
     markRecoveryFlow();
@@ -61,32 +67,31 @@ export async function establishRecoverySession(
   if (params.tokenHash) {
     const result = await verifyRecoveryOtp(params.tokenHash);
     if (!result.ok) {
-      return { ok: false, reason: "invalid" };
+      return {
+        ok: false,
+        reason: classifyRecoveryError(result.code, result.message),
+      };
     }
     markRecoveryFlow();
     return { ok: true };
   }
 
   if (params.code) {
-    const { error: clientError } =
-      await supabase.auth.exchangeCodeForSession(params.code);
-
-    if (!clientError) {
-      markRecoveryFlow();
-      return { ok: true };
-    }
-
+    // Single server-side exchange — PKCE verifier lives in auth cookies.
     const result = await exchangeRecoveryCode(params.code);
     if (!result.ok) {
       console.error("[recovery:code-exchange]", result);
-      return { ok: false, reason: "invalid" };
+      return {
+        ok: false,
+        reason: classifyRecoveryError(result.code, result.message),
+      };
     }
 
     markRecoveryFlow();
     return { ok: true };
   }
 
-  return { ok: false, reason: "invalid" };
+  return { ok: false, reason: "missing" };
 }
 
 export function stripRecoveryParamsFromUrl(): void {
@@ -98,6 +103,9 @@ export function stripRecoveryParamsFromUrl(): void {
   url.searchParams.delete("token_hash");
   url.searchParams.delete("type");
   url.searchParams.delete("next");
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_description");
+  url.searchParams.delete("recovery_error");
   window.history.replaceState(null, "", url.pathname + url.search);
 }
 

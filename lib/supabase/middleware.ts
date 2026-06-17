@@ -22,7 +22,7 @@ import {
   isSuperAdminOnlyPath,
   PROTECTED_PATHS,
 } from "@/lib/auth/paths";
-import { hasRecoveryCookie, isRecoveryRequest, RECOVERY_CALLBACK_NEXT, RECOVERY_PATHS } from "@/lib/auth/recovery";
+import { hasRecoveryCookie, isRecoveryRequest, RECOVERY_PATHS } from "@/lib/auth/recovery";
 import { isStaffRole } from "@/lib/auth/staff";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
 import { authDebug, authProfileTrace, isDisabledStaffGate } from "@/lib/auth/profile";
@@ -203,14 +203,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // Site URL root with recovery tokens — route to callback handler.
-  if (pathname === "/" && isRecoveryRequest(request)) {
-    const callbackUrl = request.nextUrl.clone();
-    callbackUrl.pathname = RECOVERY_PATHS.callback;
-    if (!callbackUrl.searchParams.has("next")) {
-      callbackUrl.searchParams.set("next", RECOVERY_CALLBACK_NEXT);
-    }
-    return NextResponse.redirect(callbackUrl);
+  // Site URL root or /login with recovery tokens — forward to /reset-password.
+  if (
+    (pathname === "/" || pathname === "/login") &&
+    isRecoveryRequest(request)
+  ) {
+    const resetUrl = request.nextUrl.clone();
+    resetUrl.pathname = RECOVERY_PATHS.resetPassword;
+    return NextResponse.redirect(resetUrl);
   }
 
   const client = createMiddlewareClient(request);

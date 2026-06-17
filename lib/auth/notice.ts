@@ -20,7 +20,7 @@ export function getAuthNoticeMessage(
     case "signed_out":
       return "You have been signed out successfully.";
     case "password_updated":
-      return "Password updated successfully.";
+      return "Your password has been updated successfully.";
     default:
       return null;
   }

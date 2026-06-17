@@ -22,6 +22,7 @@ import {
   isSuperAdminOnlyPath,
   PROTECTED_PATHS,
 } from "@/lib/auth/paths";
+import { hasRecoveryCookie, isRecoveryRequest, RECOVERY_CALLBACK_NEXT, RECOVERY_PATHS } from "@/lib/auth/recovery";
 import { isStaffRole } from "@/lib/auth/staff";
 import { fetchProfileByUserId } from "@/lib/auth/fetch-profile";
 import { authDebug, authProfileTrace, isDisabledStaffGate } from "@/lib/auth/profile";
@@ -197,9 +198,19 @@ export async function updateSession(request: NextRequest) {
   const legacyError = request.nextUrl.searchParams.get("error");
   const existingNotice = readAuthNoticeCookie(request);
 
-  // OAuth callback must run without middleware redirects or extra auth calls.
-  if (pathname.startsWith("/auth/callback")) {
+  // OAuth / recovery callback must run without middleware redirects or extra auth calls.
+  if (pathname.startsWith(RECOVERY_PATHS.callback)) {
     return NextResponse.next({ request });
+  }
+
+  // Site URL root with recovery tokens — route to callback handler.
+  if (pathname === "/" && isRecoveryRequest(request)) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = RECOVERY_PATHS.callback;
+    if (!callbackUrl.searchParams.has("next")) {
+      callbackUrl.searchParams.set("next", RECOVERY_CALLBACK_NEXT);
+    }
+    return NextResponse.redirect(callbackUrl);
   }
 
   const client = createMiddlewareClient(request);
@@ -229,7 +240,7 @@ export async function updateSession(request: NextRequest) {
 
   // No session cookies — skip Supabase auth call entirely.
   if (!hasAuthCookies) {
-    if (isRecoveryPath(pathname)) {
+    if (isRecoveryPath(pathname) || isRecoveryRequest(request)) {
       return getResponse();
     }
     if (isProtectedPath(pathname)) {
@@ -305,7 +316,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // --- Password recovery: never redirect away or block ---
-  if (isRecoveryPath(pathname)) {
+  if (isRecoveryPath(pathname) || isRecoveryRequest(request)) {
     return getResponse();
   }
 
@@ -314,6 +325,10 @@ export async function updateSession(request: NextRequest) {
     const notice: AuthNoticeKind = sessionExpired
       ? "session_ended"
       : "sign_in_required";
+
+    if (isRecoveryRequest(request)) {
+      return getResponse();
+    }
 
     if (isProtectedPath(pathname)) {
       return redirectToLogin(request, notice, pathname);
@@ -386,6 +401,9 @@ export async function updateSession(request: NextRequest) {
 
   // Auth pages: redirect into the app when profile is valid.
   if (isAuthPath(pathname)) {
+    if (hasRecoveryCookie(request) || isRecoveryRequest(request)) {
+      return redirectToApp(request, AUTH_PATHS.resetPassword);
+    }
     if (profile) {
       return redirectToApp(request, getRedirectPathForRole(role));
     }

@@ -1,3 +1,5 @@
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
+
 /** localStorage key prefixes tied to authenticated user state. */
 const AUTH_STORAGE_PREFIXES = [
   "ifranchise-admin-notifications-read",
@@ -5,8 +7,6 @@ const AUTH_STORAGE_PREFIXES = [
   "ifranchise-settings",
   "ifranchise-profile-extras",
 ] as const;
-
-const RECOVERY_COOKIE = "if_auth_recovery";
 
 function isSupabaseAuthStorageKey(key: string): boolean {
   return key.startsWith("sb-") || key.includes("-auth-token");

@@ -7,6 +7,7 @@ import {
   applyNoStoreHeaders,
   clearSupabaseAuthCookies,
 } from "@/lib/auth/cookies";
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
 import { setAuthNoticeCookie } from "@/lib/auth/notice";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { fetchWithTimeoutServer } from "@/lib/supabase/fetch-server";
@@ -47,7 +48,7 @@ async function buildLogoutResponse(request: NextRequest) {
   }
 
   clearSupabaseAuthCookies(request, response);
-  response.cookies.set("if_auth_recovery", "", {
+  response.cookies.set(RECOVERY_COOKIE, "", {
     path: "/",
     maxAge: 0,
     expires: new Date(0),

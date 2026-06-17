@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { hasRecoveryFlowCookie } from "@/lib/auth/recovery-cookie";
+
 /**
  * Re-validates session when the user returns via the back button (bfcache).
  * Attempts silent refresh before redirecting to login.
@@ -9,6 +11,15 @@ import { useEffect } from "react";
 export function AuthSessionGuard() {
   useEffect(() => {
     async function recoverOrRedirect() {
+      if (hasRecoveryFlowCookie()) {
+        return;
+      }
+
+      const path = window.location.pathname;
+      if (path === "/reset-password" || path.startsWith("/auth/callback")) {
+        return;
+      }
+
       try {
         const refresh = await fetch("/api/auth/refresh", {
           method: "POST",

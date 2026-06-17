@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AuthExperience } from "@/components/auth/auth-experience";
+import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { resolveAuthState } from "@/lib/auth/auth-state";
 import {
   AUTH_ERROR_CODES,
@@ -18,6 +19,7 @@ import {
   legacyErrorToNotice,
   type AuthNoticeKind,
 } from "@/lib/auth/notice";
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery";
 import { authDebug } from "@/lib/auth/profile";
 import { getSupabaseEnvStatus } from "@/lib/supabase/env";
 import { createClientOptional } from "@/lib/supabase/server";
@@ -30,6 +32,10 @@ type LoginPageProps = {
     ended?: string;
     signin?: string;
     updated?: string;
+    code?: string;
+    type?: string;
+    token_hash?: string;
+    next?: string;
   }>;
 };
 
@@ -59,7 +65,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const cookieNotice = await readNotice();
   const legacyNotice = legacyErrorToNotice(params.error);
   const cookieStore = await cookies();
-  const recoveryFlow = cookieStore.get("if_auth_recovery")?.value === "1";
+  const recoveryFlow = cookieStore.get(RECOVERY_COOKIE)?.value === "1";
+  const hasRecoveryParams =
+    params.type === "recovery" ||
+    params.next === "/reset-password" ||
+    Boolean(params.code) ||
+    Boolean(params.token_hash);
+  const suppressSessionNotice = recoveryFlow || hasRecoveryParams;
   const urlNotice: AuthNoticeKind | null =
     params.ended === "1"
       ? "session_ended"
@@ -71,15 +83,24 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             ? "password_updated"
             : null;
 
-  const notice = cookieNotice ?? legacyNotice ?? urlNotice;
+  const notice = suppressSessionNotice
+    ? urlNotice === "password_updated"
+      ? urlNotice
+      : cookieNotice === "password_updated"
+        ? cookieNotice
+        : null
+    : cookieNotice ?? legacyNotice ?? urlNotice;
   let noticeMessage = getAuthNoticeMessage(notice);
 
   if (!noticeMessage && params.error === AUTH_ERROR_CODES.unavailable) {
     noticeMessage = getAuthErrorMessage(AUTH_ERROR_CODES.unavailable);
   }
 
-  // Clear stale session cookies when session has ended.
-  if (notice === "session_ended" || params.error === AUTH_ERROR_CODES.expired) {
+  // Clear stale session cookies when session has ended (not during recovery).
+  if (
+    !suppressSessionNotice &&
+    (notice === "session_ended" || params.error === AUTH_ERROR_CODES.expired)
+  ) {
     const supabase = await createClientOptional();
     if (supabase) {
       await supabase.auth.signOut({ scope: "global" });
@@ -120,17 +141,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <AuthExperience
-      initialTab="login"
-      redirectTo={redirectTo}
-      noticeMessage={
-        noticeMessage ??
-        (authState.status === "authenticated" && !authState.profile
-          ? "Please sign in to continue."
-          : null)
-      }
-      envConfigured
-      isRetrying={authState.status === "unavailable"}
-    />
+    <>
+      <RecoveryLinkHandler />
+      <AuthExperience
+        initialTab="login"
+        redirectTo={redirectTo}
+        noticeMessage={
+          noticeMessage ??
+          (authState.status === "authenticated" && !authState.profile
+            ? "Please sign in to continue."
+            : null)
+        }
+        envConfigured
+        isRetrying={authState.status === "unavailable"}
+      />
+    </>
   );
 }

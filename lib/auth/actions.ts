@@ -3,8 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { buildPasswordResetRedirectUrl } from "@/lib/auth/recovery";
-import { validatePasswordPolicy } from "@/lib/auth/password-policy";
+import { buildPasswordResetRedirectUrl, validateRecoveryPassword } from "@/lib/auth/recovery";
 import {
   getRedirectPathForRole,
   isSafeRedirectPath,
@@ -447,6 +446,57 @@ export type RecoveryExchangeResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export async function verifyRecoveryOtp(
+  tokenHash: string,
+): Promise<RecoveryExchangeResult> {
+  const trimmed = tokenHash.trim();
+  if (!trimmed) {
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
+
+  const preflight = await preflightAuth();
+  if (preflight) {
+    return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+  }
+
+  try {
+    const supabase = await createClientOptional();
+    if (!supabase) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: trimmed,
+      type: "recovery",
+    });
+
+    if (error) {
+      authDebug("recovery-otp-verify-failed", {
+        message: error.message,
+        code: error.code,
+      });
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { ok: false, error: AUTH_ERROR_CODES.auth };
+    }
+
+    authDebug("recovery-otp-verify-ok", { userId: user.id });
+    return { ok: true };
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return { ok: false, error: AUTH_ERROR_CODES.unavailable };
+    }
+    return { ok: false, error: AUTH_ERROR_CODES.auth };
+  }
+}
+
 /**
  * Exchange a PKCE recovery code and establish a session for password reset only.
  * Does not require profile or role redirects.
@@ -507,15 +557,7 @@ export async function resetPassword(
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (!password || !confirmPassword) {
-    return { error: "Please enter and confirm your new password.", message: null };
-  }
-
-  if (password !== confirmPassword) {
-    return { error: "Passwords do not match.", message: null };
-  }
-
-  const policyError = validatePasswordPolicy(password);
+  const policyError = validateRecoveryPassword(password, confirmPassword);
   if (policyError) {
     return { error: policyError, message: null };
   }
